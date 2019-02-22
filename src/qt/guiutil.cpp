@@ -1,4 +1,4 @@
-// Copyright (c) 2011-2019 The Bitcoin Core developers
+// Copyright (c) 2011-2018 The Bitcoin Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -7,14 +7,14 @@
 #include <qt/bitcoinaddressvalidator.h>
 #include <qt/bitcoinunits.h>
 #include <qt/qvalidatedlineedit.h>
-#include <qt/sendcoinsrecipient.h>
+#include <qt/walletmodel.h>
 
 #include <base58.h>
 #include <chainparams.h>
-#include <interfaces/node.h>
-#include <key_io.h>
-#include <policy/policy.h>
 #include <primitives/transaction.h>
+#include <key_io.h>
+#include <interfaces/node.h>
+#include <policy/policy.h>
 #include <protocol.h>
 #include <script/script.h>
 #include <script/standard.h>
@@ -39,31 +39,27 @@
 #include <QClipboard>
 #include <QDateTime>
 #include <QDesktopServices>
+#include <QDesktopWidget>
 #include <QDoubleValidator>
 #include <QFileDialog>
 #include <QFont>
 #include <QFontDatabase>
 #include <QFontMetrics>
-#include <QGuiApplication>
 #include <QKeyEvent>
 #include <QLineEdit>
-#include <QList>
 #include <QMouseEvent>
 #include <QProgressDialog>
-#include <QScreen>
 #include <QSettings>
-#include <QSize>
-#include <QString>
 #include <QTextDocument> // for Qt::mightBeRichText
 #include <QThread>
 #include <QUrlQuery>
-#include <QtGlobal>
 
 #if defined(Q_OS_MAC)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
 
-#include <QProcess>
-
-void ForceActivation();
+#include <objc/objc-runtime.h>
+#include <CoreServices/CoreServices.h>
 #endif
 
 namespace GUIUtil {
@@ -108,7 +104,7 @@ void setupAddressWidget(QValidatedLineEdit *widget, QWidget *parent)
     widget->setFont(fixedPitchFont());
     // We don't want translators to use own addresses in translations
     // and this is the only place, where this address is supplied.
-    widget->setPlaceholderText(QObject::tr("Enter a Bitcoin address (e.g. %1)").arg(
+    widget->setPlaceholderText(QObject::tr("Enter a Bitflate address (e.g. %1)").arg(
         QString::fromStdString(DummyAddress(Params()))));
     widget->setValidator(new BitcoinAddressEntryValidator(parent));
     widget->setCheckValidator(new BitcoinAddressCheckValidator(parent));
@@ -179,9 +175,7 @@ bool parseBitcoinURI(QString uri, SendCoinsRecipient *out)
 
 QString formatBitcoinURI(const SendCoinsRecipient &info)
 {
-    bool bech_32 = info.address.startsWith(QString::fromStdString(Params().Bech32HRP() + "1"));
-
-    QString ret = QString("bitcoin:%1").arg(bech_32 ? info.address.toUpper() : info.address);
+    QString ret = QString("bitcoin:%1").arg(info.address);
     int paramCount = 0;
 
     if (info.amount)
@@ -248,11 +242,6 @@ QList<QModelIndex> getEntryData(QAbstractItemView *view, int column)
     if(!view || !view->selectionModel())
         return QList<QModelIndex>();
     return view->selectionModel()->selectedRows(column);
-}
-
-QString getDefaultDataDirectory()
-{
-    return boostPathToQString(GetDefaultDataDir());
 }
 
 QString getSaveFileName(QWidget *parent, const QString &caption, const QString &dir,
@@ -363,7 +352,10 @@ bool isObscured(QWidget *w)
 void bringToFront(QWidget* w)
 {
 #ifdef Q_OS_MAC
-    ForceActivation();
+    // Force application activation on macOS. With Qt 5.4 this is required when
+    // an action in the dock menu is triggered.
+    id app = objc_msgSend((id) objc_getClass("NSApplication"), sel_registerName("sharedApplication"));
+    objc_msgSend(app, sel_registerName("activateIgnoringOtherApps:"), YES);
 #endif
 
     if (w) {
@@ -400,15 +392,7 @@ bool openBitcoinConf()
     configFile.close();
 
     /* Open bitcoin.conf with the associated application */
-    bool res = QDesktopServices::openUrl(QUrl::fromLocalFile(boostPathToQString(pathConfig)));
-#ifdef Q_OS_MAC
-    // Workaround for macOS-specific behavior; see #15409.
-    if (!res) {
-        res = QProcess::startDetached("/usr/bin/open", QStringList{"-t", boostPathToQString(pathConfig)});
-    }
-#endif
-
-    return res;
+    return QDesktopServices::openUrl(QUrl::fromLocalFile(boostPathToQString(pathConfig)));
 }
 
 ToolTipToRichTextFilter::ToolTipToRichTextFilter(int _size_threshold, QObject *parent) :
@@ -555,10 +539,10 @@ fs::path static StartupShortcutPath()
 {
     std::string chain = gArgs.GetChainName();
     if (chain == CBaseChainParams::MAIN)
-        return GetSpecialFolderPath(CSIDL_STARTUP) / "Bitcoin.lnk";
+        return GetSpecialFolderPath(CSIDL_STARTUP) / "Bitflate.lnk";
     if (chain == CBaseChainParams::TESTNET) // Remove this special case when CBaseChainParams::TESTNET = "testnet4"
-        return GetSpecialFolderPath(CSIDL_STARTUP) / "Bitcoin (testnet).lnk";
-    return GetSpecialFolderPath(CSIDL_STARTUP) / strprintf("Bitcoin (%s).lnk", chain);
+        return GetSpecialFolderPath(CSIDL_STARTUP) / "Bitflate (testnet).lnk";
+    return GetSpecialFolderPath(CSIDL_STARTUP) / strprintf("Bitflate (%s).lnk", chain);
 }
 
 bool GetStartOnSystemStartup()
@@ -591,7 +575,7 @@ bool SetStartOnSystemStartup(bool fAutoStart)
             // Start client minimized
             QString strArgs = "-min";
             // Set -testnet /-regtest options
-            strArgs += QString::fromStdString(strprintf(" -chain=%s", gArgs.GetChainName()));
+            strArgs += QString::fromStdString(strprintf(" -testnet=%d -regtest=%d", gArgs.GetBoolArg("-testnet", false), gArgs.GetBoolArg("-regtest", false)));
 
             // Set the path to the shortcut target
             psl->SetPath(pszExePath);
@@ -638,8 +622,8 @@ fs::path static GetAutostartFilePath()
 {
     std::string chain = gArgs.GetChainName();
     if (chain == CBaseChainParams::MAIN)
-        return GetAutostartDir() / "bitcoin.desktop";
-    return GetAutostartDir() / strprintf("bitcoin-%s.desktop", chain);
+        return GetAutostartDir() / "bitflate.desktop";
+    return GetAutostartDir() / strprintf("bitflate-%s.lnk", chain);
 }
 
 bool GetStartOnSystemStartup()
@@ -683,10 +667,10 @@ bool SetStartOnSystemStartup(bool fAutoStart)
         optionFile << "[Desktop Entry]\n";
         optionFile << "Type=Application\n";
         if (chain == CBaseChainParams::MAIN)
-            optionFile << "Name=Bitcoin\n";
+            optionFile << "Name=Bitflate\n";
         else
-            optionFile << strprintf("Name=Bitcoin (%s)\n", chain);
-        optionFile << "Exec=" << pszExePath << strprintf(" -min -chain=%s\n", chain);
+            optionFile << strprintf("Name=Bitflate (%s)\n", chain);
+        optionFile << "Exec=" << pszExePath << strprintf(" -min -testnet=%d -regtest=%d\n", gArgs.GetBoolArg("-testnet", false), gArgs.GetBoolArg("-regtest", false));
         optionFile << "Terminal=false\n";
         optionFile << "Hidden=false\n";
         optionFile.close();
@@ -694,6 +678,87 @@ bool SetStartOnSystemStartup(bool fAutoStart)
     return true;
 }
 
+
+#elif defined(Q_OS_MAC) && defined(MAC_OS_X_VERSION_MIN_REQUIRED) && MAC_OS_X_VERSION_MIN_REQUIRED <= 101100
+// based on: https://github.com/Mozketo/LaunchAtLoginController/blob/master/LaunchAtLoginController.m
+
+LSSharedFileListItemRef findStartupItemInList(CFArrayRef listSnapshot, LSSharedFileListRef list, CFURLRef findUrl)
+{
+    if (listSnapshot == nullptr) {
+        return nullptr;
+    }
+
+    // loop through the list of startup items and try to find the bitcoin app
+    for(int i = 0; i < CFArrayGetCount(listSnapshot); i++) {
+        LSSharedFileListItemRef item = (LSSharedFileListItemRef)CFArrayGetValueAtIndex(listSnapshot, i);
+        UInt32 resolutionFlags = kLSSharedFileListNoUserInteraction | kLSSharedFileListDoNotMountVolumes;
+        CFURLRef currentItemURL = nullptr;
+
+#if defined(MAC_OS_X_VERSION_MAX_ALLOWED) && MAC_OS_X_VERSION_MAX_ALLOWED >= 10100
+        if(&LSSharedFileListItemCopyResolvedURL)
+            currentItemURL = LSSharedFileListItemCopyResolvedURL(item, resolutionFlags, nullptr);
+#if defined(MAC_OS_X_VERSION_MIN_REQUIRED) && MAC_OS_X_VERSION_MIN_REQUIRED < 10100
+        else
+            LSSharedFileListItemResolve(item, resolutionFlags, &currentItemURL, nullptr);
+#endif
+#else
+        LSSharedFileListItemResolve(item, resolutionFlags, &currentItemURL, nullptr);
+#endif
+
+        if(currentItemURL) {
+            if (CFEqual(currentItemURL, findUrl)) {
+                // found
+                CFRelease(currentItemURL);
+                return item;
+            }
+            CFRelease(currentItemURL);
+        }
+    }
+    return nullptr;
+}
+
+bool GetStartOnSystemStartup()
+{
+    CFURLRef bitcoinAppUrl = CFBundleCopyBundleURL(CFBundleGetMainBundle());
+    if (bitcoinAppUrl == nullptr) {
+        return false;
+    }
+
+    LSSharedFileListRef loginItems = LSSharedFileListCreate(nullptr, kLSSharedFileListSessionLoginItems, nullptr);
+    CFArrayRef listSnapshot = LSSharedFileListCopySnapshot(loginItems, nullptr);
+    bool res = (findStartupItemInList(listSnapshot, loginItems, bitcoinAppUrl) != nullptr);
+    CFRelease(bitcoinAppUrl);
+    CFRelease(loginItems);
+    CFRelease(listSnapshot);
+    return res;
+}
+
+bool SetStartOnSystemStartup(bool fAutoStart)
+{
+    CFURLRef bitcoinAppUrl = CFBundleCopyBundleURL(CFBundleGetMainBundle());
+    if (bitcoinAppUrl == nullptr) {
+        return false;
+    }
+
+    LSSharedFileListRef loginItems = LSSharedFileListCreate(nullptr, kLSSharedFileListSessionLoginItems, nullptr);
+    CFArrayRef listSnapshot = LSSharedFileListCopySnapshot(loginItems, nullptr);
+    LSSharedFileListItemRef foundItem = findStartupItemInList(listSnapshot, loginItems, bitcoinAppUrl);
+
+    if(fAutoStart && !foundItem) {
+        // add bitcoin app to startup item list
+        LSSharedFileListInsertItemURL(loginItems, kLSSharedFileListItemBeforeFirst, nullptr, nullptr, bitcoinAppUrl, nullptr, nullptr);
+    }
+    else if(!fAutoStart && foundItem) {
+        // remove item
+        LSSharedFileListItemRemove(loginItems, foundItem);
+    }
+
+    CFRelease(bitcoinAppUrl);
+    CFRelease(loginItems);
+    CFRelease(listSnapshot);
+    return true;
+}
+#pragma GCC diagnostic pop
 #else
 
 bool GetStartOnSystemStartup() { return false; }
@@ -737,33 +802,35 @@ QString formatDurationStr(int secs)
     return strList.join(" ");
 }
 
-QString serviceFlagToStr(const quint64 mask, const int bit)
-{
-    switch (ServiceFlags(mask)) {
-    case NODE_NONE: abort();  // impossible
-    case NODE_NETWORK:         return "NETWORK";
-    case NODE_GETUTXO:         return "GETUTXO";
-    case NODE_BLOOM:           return "BLOOM";
-    case NODE_WITNESS:         return "WITNESS";
-    case NODE_NETWORK_LIMITED: return "NETWORK_LIMITED";
-    // Not using default, so we get warned when a case is missing
-    }
-    if (bit < 8) {
-        return QString("%1[%2]").arg("UNKNOWN").arg(mask);
-    } else {
-        return QString("%1[2^%2]").arg("UNKNOWN").arg(bit);
-    }
-}
-
 QString formatServicesStr(quint64 mask)
 {
     QStringList strList;
 
-    for (int i = 0; i < 64; i++) {
-        uint64_t check = 1LL << i;
+    // Just scan the last 8 bits for now.
+    for (int i = 0; i < 8; i++) {
+        uint64_t check = 1 << i;
         if (mask & check)
         {
-            strList.append(serviceFlagToStr(check, i));
+            switch (check)
+            {
+            case NODE_NETWORK:
+                strList.append("NETWORK");
+                break;
+            case NODE_GETUTXO:
+                strList.append("GETUTXO");
+                break;
+            case NODE_BLOOM:
+                strList.append("BLOOM");
+                break;
+            case NODE_WITNESS:
+                strList.append("WITNESS");
+                break;
+            case NODE_XTHIN:
+                strList.append("XTHIN");
+                break;
+            default:
+                strList.append(QString("%1[%2]").arg("UNKNOWN").arg(check));
+            }
         }
     }
 
@@ -773,9 +840,9 @@ QString formatServicesStr(quint64 mask)
         return QObject::tr("None");
 }
 
-QString formatPingTime(int64_t ping_usec)
+QString formatPingTime(double dPingTime)
 {
-    return (ping_usec == std::numeric_limits<int64_t>::max() || ping_usec == 0) ? QObject::tr("N/A") : QString(QObject::tr("%1 ms")).arg(QString::number((int)(ping_usec / 1000), 10));
+    return (dPingTime == std::numeric_limits<int64_t>::max()/1e6 || dPingTime == 0) ? QObject::tr("N/A") : QString(QObject::tr("%1 ms")).arg(QString::number((int)(dPingTime * 1000), 10));
 }
 
 QString formatTimeOffset(int64_t nTimeOffset)
@@ -836,7 +903,7 @@ qreal calculateIdealFontSize(int width, const QString& text, QFont font, qreal m
     while(font_size >= minPointSize) {
         font.setPointSizeF(font_size);
         QFontMetrics fm(font);
-        if (TextWidth(fm, text) < width) {
+        if (fm.width(text) < width) {
             break;
         }
         font_size -= 0.5;
@@ -868,40 +935,12 @@ void PolishProgressDialog(QProgressDialog* dialog)
 {
 #ifdef Q_OS_MAC
     // Workaround for macOS-only Qt bug; see: QTBUG-65750, QTBUG-70357.
-    const int margin = TextWidth(dialog->fontMetrics(), ("X"));
+    const int margin = dialog->fontMetrics().width("X");
     dialog->resize(dialog->width() + 2 * margin, dialog->height());
     dialog->show();
 #else
     Q_UNUSED(dialog);
 #endif
-}
-
-int TextWidth(const QFontMetrics& fm, const QString& text)
-{
-#if (QT_VERSION >= QT_VERSION_CHECK(5, 11, 0))
-    return fm.horizontalAdvance(text);
-#else
-    return fm.width(text);
-#endif
-}
-
-void LogQtInfo()
-{
-#ifdef QT_STATIC
-    const std::string qt_link{"static"};
-#else
-    const std::string qt_link{"dynamic"};
-#endif
-#ifdef QT_STATICPLUGIN
-    const std::string plugin_link{"static"};
-#else
-    const std::string plugin_link{"dynamic"};
-#endif
-    LogPrintf("Qt %s (%s), plugin=%s (%s)\n", qVersion(), qt_link, QGuiApplication::platformName().toStdString(), plugin_link);
-    LogPrintf("System: %s, %s\n", QSysInfo::prettyProductName().toStdString(), QSysInfo::buildAbi().toStdString());
-    for (const QScreen* s : QGuiApplication::screens()) {
-        LogPrintf("Screen: %s %dx%d, pixel ratio=%.1f\n", s->name().toStdString(), s->size().width(), s->size().height(), s->devicePixelRatio());
-    }
 }
 
 } // namespace GUIUtil
