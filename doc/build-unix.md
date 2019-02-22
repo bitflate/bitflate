@@ -55,7 +55,7 @@ Memory Requirements
 --------------------
 
 C++ compilers are memory-hungry. It is recommended to have at least 1.5 GB of
-memory available when compiling Bitcoin Core. On systems with less, gcc can be
+memory available when compiling Bitflate Core. On systems with less, gcc can be
 tuned to conserve memory with additional CXXFLAGS:
 
 
@@ -110,7 +110,7 @@ libqrencode (optional) can be installed with:
 
     sudo apt-get install libqrencode-dev
 
-Once these are installed, they will be found by configure and a bitcoin-qt executable will be
+Once these are installed, they will be found by configure and a bitflate-qt executable will be
 built by default.
 
 
@@ -136,7 +136,7 @@ libqrencode (optional) can be installed with:
 
 Notes
 -----
-The release is built with GCC and then "strip bitcoind" to strip the debug
+The release is built with GCC and then "strip bitflated" to strip the debug
 symbols, which reduces the executable size by about 90%.
 
 
@@ -199,7 +199,7 @@ Hardening enables the following features:
 
     To test that you have built PIE executable, install scanelf, part of paxutils, and use:
 
-    	scanelf -e ./bitcoin
+    	scanelf -e ./bitflate
 
     The output should contain:
 
@@ -244,8 +244,8 @@ Setup and Build Example: Arch Linux
 This example lists the steps necessary to setup and build a command line only, non-wallet distribution of the latest changes on Arch Linux:
 
     pacman -S git base-devel boost libevent python
-    git clone https://github.com/bitcoin/bitcoin.git
-    cd bitcoin/
+    git clone https://github.com/bitflate-project/bitflate.git
+    cd bitflate/
     ./autogen.sh
     ./configure --disable-wallet --without-gui --without-miniupnpc
     make check
@@ -254,7 +254,7 @@ Note:
 Enabling wallet support requires either compiling against a Berkeley DB newer than 4.8 (package `db`) using `--with-incompatible-bdb`,
 or building and depending on a local version of Berkeley DB 4.8. The readily available Arch Linux packages are currently built using
 `--with-incompatible-bdb` according to the [PKGBUILD](https://projects.archlinux.org/svntogit/community.git/tree/bitcoin/trunk/PKGBUILD).
-As mentioned above, when maintaining portability of the wallet between the standard Bitcoin Core distributions and independently built
+As mentioned above, when maintaining portability of the wallet between the standard Bitflate Core distributions and independently built
 node software is desired, Berkeley DB 4.8 must be used.
 
 
