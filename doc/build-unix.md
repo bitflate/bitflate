@@ -44,7 +44,7 @@ Optional dependencies:
  miniupnpc   | UPnP Support     | Firewall-jumping support
  libdb4.8    | Berkeley DB      | Wallet storage (only needed when wallet enabled)
  qt          | GUI              | GUI toolkit (only needed when GUI enabled)
- protobuf    | Payments in GUI  | Data interchange format used for payment protocol (only needed when BIP70 enabled)
+ protobuf    | Payments in GUI  | Data interchange format used for payment protocol (only needed when GUI enabled)
  libqrencode | QR codes in GUI  | Optional for generating QR codes (only needed when GUI enabled)
  univalue    | Utility          | JSON parsing and encoding (bundled version will be used unless --with-system-univalue passed to configure)
  libzmq3     | ZMQ notification | Optional, allows generating ZMQ notifications (requires ZMQ version >= 4.0.0)
@@ -55,20 +55,12 @@ Memory Requirements
 --------------------
 
 C++ compilers are memory-hungry. It is recommended to have at least 1.5 GB of
-memory available when compiling Bitcoin Core. On systems with less, gcc can be
+memory available when compiling Bitflate Core. On systems with less, gcc can be
 tuned to conserve memory with additional CXXFLAGS:
 
 
     ./configure CXXFLAGS="--param ggc-min-expand=1 --param ggc-min-heapsize=32768"
 
-Alternatively, or in addition, debugging information can be skipped for compilation. The default compile flags are
-`-g -O2`, and can be changed with:
-
-    ./configure CXXFLAGS="-O2"
-
-Finally, clang (often less resource hungry) can be used instead of gcc, which is used by default:
-
-    ./configure CXX=clang++ CC=clang
 
 ## Linux Distribution Specific Instructions
 
@@ -86,17 +78,23 @@ Now, you can either build from self-compiled [depends](/depends/README.md) or in
 
 BerkeleyDB is required for the wallet.
 
-Ubuntu and Debian have their own `libdb-dev` and `libdb++-dev` packages, but these will install
+**For Ubuntu only:** db4.8 packages are available [here](https://launchpad.net/~bitcoin/+archive/bitcoin).
+You can add the repository and install using the following commands:
+
+    sudo apt-get install software-properties-common
+    sudo add-apt-repository ppa:bitcoin/bitcoin
+    sudo apt-get update
+    sudo apt-get install libdb4.8-dev libdb4.8++-dev
+
+Ubuntu and Debian have their own libdb-dev and libdb++-dev packages, but these will install
 BerkeleyDB 5.1 or later. This will break binary wallet compatibility with the distributed executables, which
 are based on BerkeleyDB 4.8. If you do not care about wallet compatibility,
 pass `--with-incompatible-bdb` to configure.
 
-Otherwise, you can build from self-compiled `depends` (see above).
-
 To build Bitcoin Core without wallet, see [*Disable-wallet mode*](/doc/build-unix.md#disable-wallet-mode)
 
 
-Optional (see `--with-miniupnpc` and `--enable-upnp-default`):
+Optional (see --with-miniupnpc and --enable-upnp-default):
 
     sudo apt-get install libminiupnpc-dev
 
@@ -112,17 +110,13 @@ To build without GUI pass `--without-gui`.
 
 To build with Qt 5 you need the following:
 
-    sudo apt-get install libqt5gui5 libqt5core5a libqt5dbus5 qttools5-dev qttools5-dev-tools
+    sudo apt-get install libqt5gui5 libqt5core5a libqt5dbus5 qttools5-dev qttools5-dev-tools libprotobuf-dev protobuf-compiler
 
 libqrencode (optional) can be installed with:
 
     sudo apt-get install libqrencode-dev
 
-protobuf (optional) can be installed with:
-
-    sudo apt-get install libprotobuf-dev protobuf-compiler
-
-Once these are installed, they will be found by configure and a bitcoin-qt executable will be
+Once these are installed, they will be found by configure and a bitflate-qt executable will be
 built by default.
 
 
@@ -134,29 +128,21 @@ Build requirements:
 
     sudo dnf install gcc-c++ libtool make autoconf automake openssl-devel libevent-devel boost-devel libdb4-devel libdb4-cxx-devel python3
 
-Optional (see `--with-miniupnpc` and `--enable-upnp-default`):
+Optional:
 
     sudo dnf install miniupnpc-devel
 
-ZMQ dependencies (provides ZMQ API):
-
-    sudo dnf install zeromq-devel
-
 To build with Qt 5 you need the following:
 
-    sudo dnf install qt5-qttools-devel qt5-qtbase-devel
+    sudo dnf install qt5-qttools-devel qt5-qtbase-devel protobuf-devel
 
 libqrencode (optional) can be installed with:
 
     sudo dnf install qrencode-devel
 
-protobuf (optional) can be installed with:
-
-    sudo dnf install protobuf-devel
-
 Notes
 -----
-The release is built with GCC and then "strip bitcoind" to strip the debug
+The release is built with GCC and then "strip bitflated" to strip the debug
 symbols, which reduces the executable size by about 90%.
 
 
@@ -219,7 +205,7 @@ Hardening enables the following features:
 
     To test that you have built PIE executable, install scanelf, part of paxutils, and use:
 
-    	scanelf -e ./bitcoin
+    	scanelf -e ./bitflate
 
     The output should contain:
 
@@ -264,8 +250,8 @@ Setup and Build Example: Arch Linux
 This example lists the steps necessary to setup and build a command line only, non-wallet distribution of the latest changes on Arch Linux:
 
     pacman -S git base-devel boost libevent python
-    git clone https://github.com/bitcoin/bitcoin.git
-    cd bitcoin/
+    git clone https://github.com/bitflate-project/bitflate.git
+    cd bitflate/
     ./autogen.sh
     ./configure --disable-wallet --without-gui --without-miniupnpc
     make check
@@ -274,7 +260,7 @@ Note:
 Enabling wallet support requires either compiling against a Berkeley DB newer than 4.8 (package `db`) using `--with-incompatible-bdb`,
 or building and depending on a local version of Berkeley DB 4.8. The readily available Arch Linux packages are currently built using
 `--with-incompatible-bdb` according to the [PKGBUILD](https://projects.archlinux.org/svntogit/community.git/tree/bitcoin/trunk/PKGBUILD).
-As mentioned above, when maintaining portability of the wallet between the standard Bitcoin Core distributions and independently built
+As mentioned above, when maintaining portability of the wallet between the standard Bitflate Core distributions and independently built
 node software is desired, Berkeley DB 4.8 must be used.
 
 
