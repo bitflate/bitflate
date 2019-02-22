@@ -43,7 +43,7 @@ Help
 ---------------------
 `-?` will print a list of options and exit:
 
-    src/bench/bench_bitcoin -?
+    src/bench/bench_Bitflate -?
 
 Notes
 ---------------------
