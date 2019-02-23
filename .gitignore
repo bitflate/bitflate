@@ -11,6 +11,9 @@ src/test/test_bitcoin_fuzzy
 src/qt/test/test_bitcoin-qt
 
 src/bitflated
+src/bitflate-cli
+src/bitflate-tx
+src/bitflate-wallet
 
 # autoreconf
 Makefile.in
