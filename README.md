@@ -19,7 +19,7 @@ Bitflate is not a Store of Value.
 Technical
 -------
 
-Bitflate is based in Bitcoin. It has the following differences:
+Bitflate is based on Bitcoin. It has the following differences:
 
 - It creates 10.5 million coins in the first halving.
 - In subsequent halvings, coins inflate 7%.
