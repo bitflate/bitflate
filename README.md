@@ -28,13 +28,13 @@ Bitflate is based on Bitcoin. It has the following differences:
 FAQ
 -------
 
-##### Why do you want to have inflation?
+#### Why do you want to have inflation?
 
 Bitcoin has fixed supply. The currency is deflationary. It causes price to fluctuate wildly. We think it is a good Store of Value (SoV). But for transactions, price fluctuation is a problem.
 
 Existing stable coins are typically implemented through bank ledger. This requires 3rd party centralized banks. We want to create a stable coin through inflation. We think inflation would add liquidity to Bitflate currency.
 
-##### Why Bitflate inflation rate is 7%?
+#### Why Bitflate inflation rate is 7%?
 
 We take the reverse-Bitcoin approach of setting inflation rate fairly high. If we set the rate low, the currency may behave just like Bitcoin.
 
