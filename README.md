@@ -11,8 +11,8 @@ The goal is to create a stable crypto currency, stable coin through inflation.
 
 By adding inflation, we can:
 
-- Prevent price from rising.
-- Discourage HODL behavior.
+- Prevent price from fluctuating wildly.
+- Discourage HODL behavior, increase liquidity.
 
 Bitflate is not a Store of Value.
 
