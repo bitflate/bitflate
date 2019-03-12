@@ -1156,7 +1156,7 @@ CAmount GetBlockSubsidy(int nHeight, const Consensus::Params& consensusParams)
     int halvings = nHeight / consensusParams.nSubsidyHalvingInterval;
     CAmount nSubsidy = 0;
     // Inflation starts at halvings 2.
-    // At that point, we'd have 100,500,000 (100.5 million) coins.
+    // At that point, we'd have 10,500,000 (10.5 million) coins.
     // Those are our base coins.
     // After halving 1, we calculate inflate coin number.
     if (halvings > 1) {
