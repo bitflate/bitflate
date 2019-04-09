@@ -283,8 +283,9 @@ RES_ICONS = \
   qt/res/icons/address-book.png \
   qt/res/icons/about.png \
   qt/res/icons/about_qt.png \
-  qt/res/icons/bitcoin.ico \
-  qt/res/icons/bitcoin_testnet.ico \
+  qt/res/icons/bitflate.ico \
+  qt/res/icons/bitflate_testnet.ico \
+  qt/res/icons/bitflate.png \
   qt/res/icons/bitcoin.png \
   qt/res/icons/chevron.png \
   qt/res/icons/clock1.png \
