@@ -1,6 +1,6 @@
 # Linearize
-Construct a linear, no-fork, best version of the Bitflate blockchain. The scripts
-run using Python 3 but are compatible with Python 2.
+Construct a linear, no-fork, best version of the Bitflate blockchain.
+
 
 ## Step 1: Download hash list
 

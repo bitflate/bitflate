@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Copyright (c) 2014-2018 The Bitcoin Core developers
+# Copyright (c) 2014-2019 The Bitcoin Core developers
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
 """Run regression test suite.
@@ -110,6 +110,7 @@ BASE_SCRIPTS = [
     'wallet_txn_clone.py',
     'wallet_txn_clone.py --segwit',
     'rpc_getchaintips.py',
+    'rpc_misc.py',
     'interface_rest.py',
     'mempool_spend_coinbase.py',
     'mempool_reorg.py',
@@ -477,6 +478,11 @@ class TestHandler:
                               log_stderr))
         if not self.jobs:
             raise IndexError('pop from empty list')
+
+        # Print remaining running jobs when all jobs have been started.
+        if not self.test_list:
+            print("Remaining jobs: [{}]".format(", ".join(j[0] for j in self.jobs)))
+
         dot_count = 0
         while True:
             # Return first proc that finishes

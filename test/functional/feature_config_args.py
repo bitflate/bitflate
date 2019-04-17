@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Copyright (c) 2017-2018 The Bitcoin Core developers
+# Copyright (c) 2017-2019 The Bitcoin Core developers
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
 """Test various command line arguments and configuration file parameters."""
@@ -25,6 +25,10 @@ class ConfArgsTest(BitcoinTestFramework):
             conf.write('-dash=1\n')
         self.nodes[0].assert_start_raises_init_error(expected_msg='Error reading configuration file: parse error on line 1: -dash=1, options in configuration file must be specified without leading -')
 
+        with open(inc_conf_file_path, 'w', encoding='utf8') as conf:
+            conf.write("wallet=foo\n")
+        self.nodes[0].assert_start_raises_init_error(expected_msg='Error: Config setting for -wallet only applied on regtest network when in [regtest] section.')
+
         with open(inc_conf_file_path, 'w', encoding='utf-8') as conf:
             conf.write('nono\n')
         self.nodes[0].assert_start_raises_init_error(expected_msg='Error reading configuration file: parse error on line 1: nono, if you intended to specify a negated option, use nono=1 instead')
@@ -41,12 +45,20 @@ class ConfArgsTest(BitcoinTestFramework):
             conf.write('server=1\nrpcuser=someuser\n[main]\nrpcpassword=some#pass')
         self.nodes[0].assert_start_raises_init_error(expected_msg='Error reading configuration file: parse error on line 4, using # in rpcpassword can be ambiguous and should be avoided')
 
-        with open(inc_conf_file_path, 'w', encoding='utf-8') as conf:
-            conf.write('testnot.datadir=1\n[testnet]\n')
-        self.restart_node(0)
-        self.nodes[0].stop_node(expected_stderr='Warning: Section [testnet] is not recognized.' + os.linesep + 'Warning: Section [testnot] is not recognized.')
+        inc_conf_file2_path = os.path.join(self.nodes[0].datadir, 'include2.conf')
+        with open(os.path.join(self.nodes[0].datadir, 'bitcoin.conf'), 'a', encoding='utf-8') as conf:
+            conf.write('includeconf={}\n'.format(inc_conf_file2_path))
 
         with open(inc_conf_file_path, 'w', encoding='utf-8') as conf:
+            conf.write('testnot.datadir=1\n')
+        with open(inc_conf_file2_path, 'w', encoding='utf-8') as conf:
+            conf.write('[testnet]\n')
+        self.restart_node(0)
+        self.nodes[0].stop_node(expected_stderr='Warning: ' + inc_conf_file_path + ':1 Section [testnot] is not recognized.' + os.linesep + 'Warning: ' + inc_conf_file2_path + ':1 Section [testnet] is not recognized.')
+
+        with open(inc_conf_file_path, 'w', encoding='utf-8') as conf:
+            conf.write('')  # clear
+        with open(inc_conf_file2_path, 'w', encoding='utf-8') as conf:
             conf.write('')  # clear
 
     def run_test(self):

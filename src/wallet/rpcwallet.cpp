@@ -7,7 +7,6 @@
 #include <chain.h>
 #include <consensus/validation.h>
 #include <core_io.h>
-#include <httpserver.h>
 #include <init.h>
 #include <interfaces/chain.h>
 #include <validation.h>
@@ -19,8 +18,7 @@
 #include <policy/fees.h>
 #include <policy/policy.h>
 #include <policy/rbf.h>
-#include <rpc/mining.h>
-#include <rpc/rawtransaction.h>
+#include <rpc/rawtransaction_util.h>
 #include <rpc/server.h>
 #include <rpc/util.h>
 #include <script/descriptor.h>
@@ -28,8 +26,11 @@
 #include <shutdown.h>
 #include <timedata.h>
 #include <util/bip32.h>
+#include <util/fees.h>
 #include <util/system.h>
 #include <util/moneystr.h>
+#include <util/url.h>
+#include <util/validation.h>
 #include <wallet/coincontrol.h>
 #include <wallet/feebumper.h>
 #include <wallet/psbtwallet.h>
@@ -124,8 +125,7 @@ static void WalletTxToJSON(interfaces::Chain& chain, interfaces::Chain::Lock& lo
     // Add opt-in RBF status
     std::string rbfStatus = "no";
     if (confirms <= 0) {
-        LOCK(mempool.cs);
-        RBFTransactionState rbfState = IsRBFOptIn(*wtx.tx, mempool);
+        RBFTransactionState rbfState = chain.isRBFOptIn(*wtx.tx);
         if (rbfState == RBFTransactionState::UNKNOWN)
             rbfStatus = "unknown";
         else if (rbfState == RBFTransactionState::REPLACEABLE_BIP125)
@@ -310,7 +310,7 @@ static UniValue setlabel(const JSONRPCRequest& request)
 
 static CTransactionRef SendMoney(interfaces::Chain::Lock& locked_chain, CWallet * const pwallet, const CTxDestination &address, CAmount nValue, bool fSubtractFeeFromAmount, const CCoinControl& coin_control, mapValue_t mapValue)
 {
-    CAmount curBalance = pwallet->GetBalance();
+    CAmount curBalance = pwallet->GetBalance().m_mine_trusted;
 
     // Check amount
     if (nValue <= 0)
@@ -319,7 +319,7 @@ static CTransactionRef SendMoney(interfaces::Chain::Lock& locked_chain, CWallet 
     if (nValue > curBalance)
         throw JSONRPCError(RPC_WALLET_INSUFFICIENT_FUNDS, "Insufficient funds");
 
-    if (pwallet->GetBroadcastTransactions() && !g_connman) {
+    if (pwallet->GetBroadcastTransactions() && !pwallet->chain().p2pEnabled()) {
         throw JSONRPCError(RPC_CLIENT_P2P_DISABLED, "Error: Peer-to-peer functionality missing or disabled");
     }
 
@@ -341,7 +341,7 @@ static CTransactionRef SendMoney(interfaces::Chain::Lock& locked_chain, CWallet 
         throw JSONRPCError(RPC_WALLET_ERROR, strError);
     }
     CValidationState state;
-    if (!pwallet->CommitTransaction(tx, std::move(mapValue), {} /* orderForm */, reservekey, g_connman.get(), state)) {
+    if (!pwallet->CommitTransaction(tx, std::move(mapValue), {} /* orderForm */, reservekey, state)) {
         strError = strprintf("Error: The transaction was rejected! Reason given: %s", FormatStateMessage(state));
         throw JSONRPCError(RPC_WALLET_ERROR, strError);
     }
@@ -425,7 +425,7 @@ static UniValue sendtoaddress(const JSONRPCRequest& request)
     }
 
     if (!request.params[6].isNull()) {
-        coin_control.m_confirm_target = ParseConfirmTarget(request.params[6]);
+        coin_control.m_confirm_target = ParseConfirmTarget(request.params[6], pwallet->chain().estimateMaxBlocks());
     }
 
     if (!request.params[7].isNull()) {
@@ -607,7 +607,6 @@ static UniValue getreceivedbyaddress(const JSONRPCRequest& request)
     // the user could have gotten from another RPC command prior to now
     pwallet->BlockUntilSyncedToCurrentChain();
 
-    LockAnnotation lock(::cs_main); // Temporary, for CheckFinalTx below. Removed in upcoming commit.
     auto locked_chain = pwallet->chain().lock();
     LOCK(pwallet->cs_wallet);
 
@@ -630,8 +629,9 @@ static UniValue getreceivedbyaddress(const JSONRPCRequest& request)
     CAmount nAmount = 0;
     for (const std::pair<const uint256, CWalletTx>& pairWtx : pwallet->mapWallet) {
         const CWalletTx& wtx = pairWtx.second;
-        if (wtx.IsCoinBase() || !CheckFinalTx(*wtx.tx))
+        if (wtx.IsCoinBase() || !locked_chain->checkFinalTx(*wtx.tx)) {
             continue;
+        }
 
         for (const CTxOut& txout : wtx.tx->vout)
             if (txout.scriptPubKey == scriptPubKey)
@@ -679,7 +679,6 @@ static UniValue getreceivedbylabel(const JSONRPCRequest& request)
     // the user could have gotten from another RPC command prior to now
     pwallet->BlockUntilSyncedToCurrentChain();
 
-    LockAnnotation lock(::cs_main); // Temporary, for CheckFinalTx below. Removed in upcoming commit.
     auto locked_chain = pwallet->chain().lock();
     LOCK(pwallet->cs_wallet);
 
@@ -696,8 +695,9 @@ static UniValue getreceivedbylabel(const JSONRPCRequest& request)
     CAmount nAmount = 0;
     for (const std::pair<const uint256, CWalletTx>& pairWtx : pwallet->mapWallet) {
         const CWalletTx& wtx = pairWtx.second;
-        if (wtx.IsCoinBase() || !CheckFinalTx(*wtx.tx))
+        if (wtx.IsCoinBase() || !locked_chain->checkFinalTx(*wtx.tx)) {
             continue;
+        }
 
         for (const CTxOut& txout : wtx.tx->vout)
         {
@@ -763,12 +763,14 @@ static UniValue getbalance(const JSONRPCRequest& request)
         min_depth = request.params[1].get_int();
     }
 
-    isminefilter filter = ISMINE_SPENDABLE;
+    bool include_watchonly = false;
     if (!request.params[2].isNull() && request.params[2].get_bool()) {
-        filter = filter | ISMINE_WATCH_ONLY;
+        include_watchonly = true;
     }
 
-    return ValueFromAmount(pwallet->GetBalance(filter, min_depth));
+    const auto bal = pwallet->GetBalance(min_depth);
+
+    return ValueFromAmount(bal.m_mine_trusted + (include_watchonly ? bal.m_watchonly_trusted : 0));
 }
 
 static UniValue getunconfirmedbalance(const JSONRPCRequest &request)
@@ -796,7 +798,7 @@ static UniValue getunconfirmedbalance(const JSONRPCRequest &request)
     auto locked_chain = pwallet->chain().lock();
     LOCK(pwallet->cs_wallet);
 
-    return ValueFromAmount(pwallet->GetUnconfirmedBalance());
+    return ValueFromAmount(pwallet->GetBalance().m_mine_untrusted_pending);
 }
 
 
@@ -809,9 +811,7 @@ static UniValue sendmany(const JSONRPCRequest& request)
         return NullUniValue;
     }
 
-    if (request.fHelp || request.params.size() < 2 || request.params.size() > 8)
-        throw std::runtime_error(
-            RPCHelpMan{"sendmany",
+    const RPCHelpMan help{"sendmany",
                 "\nSend multiple times. Amounts are double-precision floating point numbers." +
                     HelpRequiringPassphrase(pwallet) + "\n",
                 {
@@ -821,7 +821,7 @@ static UniValue sendmany(const JSONRPCRequest& request)
                             {"address", RPCArg::Type::AMOUNT, RPCArg::Optional::NO, "The bitcoin address is the key, the numeric amount (can be string) in " + CURRENCY_UNIT + " is the value"},
                         },
                     },
-                    {"minconf", RPCArg::Type::NUM, /* default */ "1", "Only use the balance confirmed at least this many times."},
+                    {"minconf", RPCArg::Type::NUM, RPCArg::Optional::OMITTED_NAMED_ARG, "Ignored dummy value"},
                     {"comment", RPCArg::Type::STR, RPCArg::Optional::OMITTED_NAMED_ARG, "A comment"},
                     {"subtractfeefrom", RPCArg::Type::ARR, RPCArg::Optional::OMITTED_NAMED_ARG, "A json array with addresses.\n"
             "                           The fee will be equally deducted from the amount of each selected address.\n"
@@ -852,7 +852,11 @@ static UniValue sendmany(const JSONRPCRequest& request)
             "\nAs a JSON-RPC call\n"
             + HelpExampleRpc("sendmany", "\"\", {\"1D1ZrZNe3JUo7ZycKEYQQiQAWd9y54F4XX\":0.01,\"1353tsE8YMTA4EuV7dgUXGjNFf9KpVvKHz\":0.02}, 6, \"testing\"")
                 },
-            }.ToString());
+    };
+
+    if (request.fHelp || !help.IsValidNumArgs(request.params.size())) {
+        throw std::runtime_error(help.ToString());
+    }
 
     // Make sure the results are valid at least up to the most recent block
     // the user could have gotten from another RPC command prior to now
@@ -861,7 +865,7 @@ static UniValue sendmany(const JSONRPCRequest& request)
     auto locked_chain = pwallet->chain().lock();
     LOCK(pwallet->cs_wallet);
 
-    if (pwallet->GetBroadcastTransactions() && !g_connman) {
+    if (pwallet->GetBroadcastTransactions() && !pwallet->chain().p2pEnabled()) {
         throw JSONRPCError(RPC_CLIENT_P2P_DISABLED, "Error: Peer-to-peer functionality missing or disabled");
     }
 
@@ -869,9 +873,6 @@ static UniValue sendmany(const JSONRPCRequest& request)
         throw JSONRPCError(RPC_INVALID_PARAMETER, "Dummy value must be set to \"\"");
     }
     UniValue sendTo = request.params[1].get_obj();
-    int nMinDepth = 1;
-    if (!request.params[2].isNull())
-        nMinDepth = request.params[2].get_int();
 
     mapValue_t mapValue;
     if (!request.params[3].isNull() && !request.params[3].get_str().empty())
@@ -887,7 +888,7 @@ static UniValue sendmany(const JSONRPCRequest& request)
     }
 
     if (!request.params[6].isNull()) {
-        coin_control.m_confirm_target = ParseConfirmTarget(request.params[6]);
+        coin_control.m_confirm_target = ParseConfirmTarget(request.params[6], pwallet->chain().estimateMaxBlocks());
     }
 
     if (!request.params[7].isNull()) {
@@ -899,7 +900,6 @@ static UniValue sendmany(const JSONRPCRequest& request)
     std::set<CTxDestination> destinations;
     std::vector<CRecipient> vecSend;
 
-    CAmount totalAmount = 0;
     std::vector<std::string> keys = sendTo.getKeys();
     for (const std::string& name_ : keys) {
         CTxDestination dest = DecodeDestination(name_);
@@ -916,7 +916,6 @@ static UniValue sendmany(const JSONRPCRequest& request)
         CAmount nAmount = AmountFromValue(sendTo[name_]);
         if (nAmount <= 0)
             throw JSONRPCError(RPC_TYPE_ERROR, "Invalid amount for send");
-        totalAmount += nAmount;
 
         bool fSubtractFeeFromAmount = false;
         for (unsigned int idx = 0; idx < subtractFeeFromAmount.size(); idx++) {
@@ -931,11 +930,6 @@ static UniValue sendmany(const JSONRPCRequest& request)
 
     EnsureWalletIsUnlocked(pwallet);
 
-    // Check funds
-    if (totalAmount > pwallet->GetLegacyBalance(ISMINE_SPENDABLE, nMinDepth)) {
-        throw JSONRPCError(RPC_WALLET_INSUFFICIENT_FUNDS, "Wallet has insufficient funds");
-    }
-
     // Shuffle recipient list
     std::shuffle(vecSend.begin(), vecSend.end(), FastRandomContext());
 
@@ -949,7 +943,7 @@ static UniValue sendmany(const JSONRPCRequest& request)
     if (!fCreated)
         throw JSONRPCError(RPC_WALLET_INSUFFICIENT_FUNDS, strFailReason);
     CValidationState state;
-    if (!pwallet->CommitTransaction(tx, std::move(mapValue), {} /* orderForm */, keyChange, g_connman.get(), state)) {
+    if (!pwallet->CommitTransaction(tx, std::move(mapValue), {} /* orderForm */, keyChange, state)) {
         strFailReason = strprintf("Transaction commit failed:: %s", FormatStateMessage(state));
         throw JSONRPCError(RPC_WALLET_ERROR, strFailReason);
     }
@@ -1051,8 +1045,6 @@ struct tallyitem
 
 static UniValue ListReceived(interfaces::Chain::Lock& locked_chain, CWallet * const pwallet, const UniValue& params, bool by_label) EXCLUSIVE_LOCKS_REQUIRED(pwallet->cs_wallet)
 {
-    LockAnnotation lock(::cs_main); // Temporary, for CheckFinalTx below. Removed in upcoming commit.
-
     // Minimum confirmations
     int nMinDepth = 1;
     if (!params[0].isNull())
@@ -1083,8 +1075,9 @@ static UniValue ListReceived(interfaces::Chain::Lock& locked_chain, CWallet * co
     for (const std::pair<const uint256, CWalletTx>& pairWtx : pwallet->mapWallet) {
         const CWalletTx& wtx = pairWtx.second;
 
-        if (wtx.IsCoinBase() || !CheckFinalTx(*wtx.tx))
+        if (wtx.IsCoinBase() || !locked_chain.checkFinalTx(*wtx.tx)) {
             continue;
+        }
 
         int nDepth = wtx.GetDepthInMainChain(locked_chain);
         if (nDepth < nMinDepth)
@@ -1763,7 +1756,7 @@ static UniValue gettransaction(const JSONRPCRequest& request)
     ListTransactions(*locked_chain, pwallet, wtx, 0, false, details, filter, nullptr /* filter_label */);
     entry.pushKV("details", details);
 
-    std::string strHex = EncodeHexTx(*wtx.tx, RPCSerializationFlags());
+    std::string strHex = EncodeHexTx(*wtx.tx, pwallet->chain().rpcSerializationFlags());
     entry.pushKV("hex", strHex);
 
     return entry;
@@ -1981,7 +1974,7 @@ static UniValue walletpassphrase(const JSONRPCRequest& request)
     // wallet before the following callback is called. If a valid shared pointer
     // is acquired in the callback then the wallet is still loaded.
     std::weak_ptr<CWallet> weak_wallet = wallet;
-    RPCRunLater(strprintf("lockwallet(%s)", pwallet->GetName()), [weak_wallet] {
+    pwallet->chain().rpcRunLater(strprintf("lockwallet(%s)", pwallet->GetName()), [weak_wallet] {
         if (auto shared_wallet = weak_wallet.lock()) {
             LOCK(shared_wallet->cs_wallet);
             shared_wallet->Lock();
@@ -2370,8 +2363,8 @@ static UniValue settxfee(const JSONRPCRequest& request)
     CFeeRate tx_fee_rate(nAmount, 1000);
     if (tx_fee_rate == 0) {
         // automatic selection
-    } else if (tx_fee_rate < ::minRelayTxFee) {
-        throw JSONRPCError(RPC_INVALID_PARAMETER, strprintf("txfee cannot be less than min relay tx fee (%s)", ::minRelayTxFee.ToString()));
+    } else if (tx_fee_rate < pwallet->chain().relayMinFee()) {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, strprintf("txfee cannot be less than min relay tx fee (%s)", pwallet->chain().relayMinFee().ToString()));
     } else if (tx_fee_rate < pwallet->m_min_fee) {
         throw JSONRPCError(RPC_INVALID_PARAMETER, strprintf("txfee cannot be less than wallet min fee (%s)", pwallet->m_min_fee.ToString()));
     }
@@ -2427,11 +2420,12 @@ static UniValue getwalletinfo(const JSONRPCRequest& request)
     UniValue obj(UniValue::VOBJ);
 
     size_t kpExternalSize = pwallet->KeypoolCountExternalKeys();
+    const auto bal = pwallet->GetBalance();
     obj.pushKV("walletname", pwallet->GetName());
     obj.pushKV("walletversion", pwallet->GetVersion());
-    obj.pushKV("balance",       ValueFromAmount(pwallet->GetBalance()));
-    obj.pushKV("unconfirmed_balance", ValueFromAmount(pwallet->GetUnconfirmedBalance()));
-    obj.pushKV("immature_balance",    ValueFromAmount(pwallet->GetImmatureBalance()));
+    obj.pushKV("balance", ValueFromAmount(bal.m_mine_trusted));
+    obj.pushKV("unconfirmed_balance", ValueFromAmount(bal.m_mine_untrusted_pending));
+    obj.pushKV("immature_balance", ValueFromAmount(bal.m_mine_immature));
     obj.pushKV("txcount",       (int)pwallet->mapWallet.size());
     obj.pushKV("keypoololdest", pwallet->GetOldestKeyPoolTime());
     obj.pushKV("keypoolsize", (int64_t)kpExternalSize);
@@ -2669,49 +2663,6 @@ static UniValue unloadwallet(const JSONRPCRequest& request)
     UnloadWallet(std::move(wallet));
 
     return NullUniValue;
-}
-
-static UniValue resendwallettransactions(const JSONRPCRequest& request)
-{
-    std::shared_ptr<CWallet> const wallet = GetWalletForJSONRPCRequest(request);
-    CWallet* const pwallet = wallet.get();
-
-    if (!EnsureWalletIsAvailable(pwallet, request.fHelp)) {
-        return NullUniValue;
-    }
-
-    if (request.fHelp || request.params.size() != 0)
-        throw std::runtime_error(
-            RPCHelpMan{"resendwallettransactions",
-                "Immediately re-broadcast unconfirmed wallet transactions to all peers.\n"
-                "Intended only for testing; the wallet code periodically re-broadcasts\n"
-                "automatically.\n",
-                {},
-                RPCResult{
-            "Returns an RPC error if -walletbroadcast is set to false.\n"
-            "Returns array of transaction ids that were re-broadcast.\n"
-                },
-                 RPCExamples{""},
-             }.ToString()
-            );
-
-    if (!g_connman)
-        throw JSONRPCError(RPC_CLIENT_P2P_DISABLED, "Error: Peer-to-peer functionality missing or disabled");
-
-    auto locked_chain = pwallet->chain().lock();
-    LOCK(pwallet->cs_wallet);
-
-    if (!pwallet->GetBroadcastTransactions()) {
-        throw JSONRPCError(RPC_WALLET_ERROR, "Error: Wallet transaction broadcasting is disabled with -walletbroadcast");
-    }
-
-    std::vector<uint256> txids = pwallet->ResendWalletTransactionsBefore(*locked_chain, GetTime(), g_connman.get());
-    UniValue result(UniValue::VARR);
-    for (const uint256& txid : txids)
-    {
-        result.push_back(txid.ToString());
-    }
-    return result;
 }
 
 static UniValue listunspent(const JSONRPCRequest& request)
@@ -2994,7 +2945,7 @@ void FundTransaction(CWallet* const pwallet, CMutableTransaction& tx, CAmount& f
             if (options.exists("feeRate")) {
                 throw JSONRPCError(RPC_INVALID_PARAMETER, "Cannot specify both conf_target and feeRate");
             }
-            coinControl.m_confirm_target = ParseConfirmTarget(options["conf_target"]);
+            coinControl.m_confirm_target = ParseConfirmTarget(options["conf_target"], pwallet->chain().estimateMaxBlocks());
         }
         if (options.exists("estimate_mode")) {
             if (options.exists("feeRate")) {
@@ -3152,7 +3103,7 @@ UniValue signrawtransactionwithwallet(const JSONRPCRequest& request)
                                     {"scriptPubKey", RPCArg::Type::STR_HEX, RPCArg::Optional::NO, "script key"},
                                     {"redeemScript", RPCArg::Type::STR_HEX, RPCArg::Optional::OMITTED, "(required for P2SH) redeem script"},
                                     {"witnessScript", RPCArg::Type::STR_HEX, RPCArg::Optional::OMITTED, "(required for P2WSH or P2SH-P2WSH) witness script"},
-                                    {"amount", RPCArg::Type::AMOUNT, RPCArg::Optional::NO, "The amount spent"},
+                                    {"amount", RPCArg::Type::AMOUNT, RPCArg::Optional::OMITTED, "(required for Segwit inputs) the amount spent"},
                                 },
                             },
                         },
@@ -3216,9 +3167,9 @@ static UniValue bumpfee(const JSONRPCRequest& request)
             RPCHelpMan{"bumpfee",
                 "\nBumps the fee of an opt-in-RBF transaction T, replacing it with a new transaction B.\n"
                 "An opt-in RBF transaction with the given txid must be in the wallet.\n"
-                "The command will pay the additional fee by decreasing (or perhaps removing) its change output.\n"
-                "If the change output is not big enough to cover the increased fee, the command will currently fail\n"
-                "instead of adding new inputs to compensate. (A future implementation could improve this.)\n"
+                "The command will pay the additional fee by reducing change outputs or adding inputs when necessary. It may add a new change output if one does not already exist.\n"
+                "If `totalFee` is given, adding inputs is not supported, so there must be a single change output that is big enough or it will fail.\n"
+                "All inputs in the original transaction will be included in the replacement transaction.\n"
                 "The command will fail if the wallet or mempool contains a transaction that spends one of T's outputs.\n"
                 "By default, the new fee will be calculated automatically using estimatesmartfee.\n"
                 "The user can specify a confirmation target for estimatesmartfee.\n"
@@ -3284,7 +3235,7 @@ static UniValue bumpfee(const JSONRPCRequest& request)
         if (options.exists("confTarget") && options.exists("totalFee")) {
             throw JSONRPCError(RPC_INVALID_PARAMETER, "confTarget and totalFee options should not both be set. Please provide either a confirmation target for fee estimation or an explicit total fee for the transaction.");
         } else if (options.exists("confTarget")) { // TODO: alias this to conf_target
-            coin_control.m_confirm_target = ParseConfirmTarget(options["confTarget"]);
+            coin_control.m_confirm_target = ParseConfirmTarget(options["confTarget"], pwallet->chain().estimateMaxBlocks());
         } else if (options.exists("totalFee")) {
             totalFee = options["totalFee"].get_int64();
             if (totalFee <= 0) {
@@ -3315,7 +3266,14 @@ static UniValue bumpfee(const JSONRPCRequest& request)
     CAmount old_fee;
     CAmount new_fee;
     CMutableTransaction mtx;
-    feebumper::Result res = feebumper::CreateTransaction(pwallet, hash, coin_control, totalFee, errors, old_fee, new_fee, mtx);
+    feebumper::Result res;
+    if (totalFee > 0) {
+        // Targeting total fee bump. Requires a change output of sufficient size.
+        res = feebumper::CreateTotalBumpTransaction(pwallet, hash, coin_control, totalFee, errors, old_fee, new_fee, mtx);
+    } else {
+        // Targeting feerate bump.
+        res = feebumper::CreateRateBumpTransaction(pwallet, hash, coin_control, errors, old_fee, new_fee, mtx);
+    }
     if (res != feebumper::Result::OK) {
         switch(res) {
             case feebumper::Result::INVALID_ADDRESS_OR_KEY:
@@ -3356,62 +3314,6 @@ static UniValue bumpfee(const JSONRPCRequest& request)
     result.pushKV("errors", result_errors);
 
     return result;
-}
-
-UniValue generate(const JSONRPCRequest& request)
-{
-    std::shared_ptr<CWallet> const wallet = GetWalletForJSONRPCRequest(request);
-    CWallet* const pwallet = wallet.get();
-
-
-    if (!EnsureWalletIsAvailable(pwallet, request.fHelp)) {
-        return NullUniValue;
-    }
-
-    if (request.fHelp || request.params.size() < 1 || request.params.size() > 2) {
-        throw std::runtime_error(
-            RPCHelpMan{"generate",
-                "\nMine up to nblocks blocks immediately (before the RPC call returns) to an address in the wallet.\n",
-                {
-                    {"nblocks", RPCArg::Type::NUM, RPCArg::Optional::NO, "How many blocks are generated immediately."},
-                    {"maxtries", RPCArg::Type::NUM, /* default */ "1000000", "How many iterations to try."},
-                },
-                RPCResult{
-            "[ blockhashes ]     (array) hashes of blocks generated\n"
-                },
-                RPCExamples{
-            "\nGenerate 11 blocks\n"
-            + HelpExampleCli("generate", "11")
-                },
-            }.ToString());
-    }
-
-    if (!IsDeprecatedRPCEnabled("generate")) {
-        throw JSONRPCError(RPC_METHOD_DEPRECATED, "The wallet generate rpc method is deprecated and will be fully removed in v0.19. "
-            "To use generate in v0.18, restart bitcoind with -deprecatedrpc=generate.\n"
-            "Clients should transition to using the node rpc method generatetoaddress\n");
-    }
-
-    int num_generate = request.params[0].get_int();
-    uint64_t max_tries = 1000000;
-    if (!request.params[1].isNull()) {
-        max_tries = request.params[1].get_int();
-    }
-
-    std::shared_ptr<CReserveScript> coinbase_script;
-    pwallet->GetScriptForMining(coinbase_script);
-
-    // If the keypool is exhausted, no script is returned at all.  Catch this.
-    if (!coinbase_script) {
-        throw JSONRPCError(RPC_WALLET_KEYPOOL_RAN_OUT, "Error: Keypool ran out, please call keypoolrefill first");
-    }
-
-    //throw an error if no script was provided
-    if (coinbase_script->reserveScript.empty()) {
-        throw JSONRPCError(RPC_INTERNAL_ERROR, "No coinbase script available");
-    }
-
-    return generateBlocks(coinbase_script, num_generate, max_tries, true);
 }
 
 UniValue rescanblockchain(const JSONRPCRequest& request)
@@ -3513,7 +3415,7 @@ class DescribeWalletAddressVisitor : public boost::static_visitor<UniValue>
 public:
     CWallet * const pwallet;
 
-    void ProcessSubScript(const CScript& subscript, UniValue& obj, bool include_addresses = false) const
+    void ProcessSubScript(const CScript& subscript, UniValue& obj) const
     {
         // Always present: script type and redeemscript
         std::vector<std::vector<unsigned char>> solutions_data;
@@ -3522,7 +3424,6 @@ public:
         obj.pushKV("hex", HexStr(subscript.begin(), subscript.end()));
 
         CTxDestination embedded;
-        UniValue a(UniValue::VARR);
         if (ExtractDestination(subscript, embedded)) {
             // Only when the script corresponds to an address.
             UniValue subobj(UniValue::VOBJ);
@@ -3535,7 +3436,6 @@ public:
             // Always report the pubkey at the top level, so that `getnewaddress()['pubkey']` always works.
             if (subobj.exists("pubkey")) obj.pushKV("pubkey", subobj["pubkey"]);
             obj.pushKV("embedded", std::move(subobj));
-            if (include_addresses) a.push_back(EncodeDestination(embedded));
         } else if (which_type == TX_MULTISIG) {
             // Also report some information on multisig scripts (which do not have a corresponding address).
             // TODO: abstract out the common functionality between this logic and ExtractDestinations.
@@ -3543,17 +3443,10 @@ public:
             UniValue pubkeys(UniValue::VARR);
             for (size_t i = 1; i < solutions_data.size() - 1; ++i) {
                 CPubKey key(solutions_data[i].begin(), solutions_data[i].end());
-                if (include_addresses) a.push_back(EncodeDestination(key.GetID()));
                 pubkeys.push_back(HexStr(key.begin(), key.end()));
             }
             obj.pushKV("pubkeys", std::move(pubkeys));
         }
-
-        // The "addresses" field is confusing because it refers to public keys using their P2PKH address.
-        // For that reason, only add the 'addresses' field when needed for backward compatibility. New applications
-        // can use the 'embedded'->'address' field for P2SH or P2WSH wrapped addresses, and 'pubkeys' for
-        // inspecting multisig participants.
-        if (include_addresses) obj.pushKV("addresses", std::move(a));
     }
 
     explicit DescribeWalletAddressVisitor(CWallet* _pwallet) : pwallet(_pwallet) {}
@@ -3576,7 +3469,7 @@ public:
         UniValue obj(UniValue::VOBJ);
         CScript subscript;
         if (pwallet && pwallet->GetCScript(scriptID, subscript)) {
-            ProcessSubScript(subscript, obj, IsDeprecatedRPCEnabled("validateaddress"));
+            ProcessSubScript(subscript, obj);
         }
         return obj;
     }
@@ -3894,7 +3787,7 @@ UniValue sethdseed(const JSONRPCRequest& request)
             }.ToString());
     }
 
-    if (IsInitialBlockDownload()) {
+    if (pwallet->chain().isInitialBlockDownload()) {
         throw JSONRPCError(RPC_CLIENT_IN_INITIAL_DOWNLOAD, "Cannot set a new HD seed while still in Initial Block Download");
     }
 
@@ -3937,19 +3830,6 @@ UniValue sethdseed(const JSONRPCRequest& request)
     if (flush_key_pool) pwallet->NewKeyPool();
 
     return NullUniValue;
-}
-
-void AddKeypathToMap(const CWallet* pwallet, const CKeyID& keyID, std::map<CPubKey, KeyOriginInfo>& hd_keypaths)
-{
-    CPubKey vchPubKey;
-    if (!pwallet->GetPubKey(keyID, vchPubKey)) {
-        return;
-    }
-    KeyOriginInfo info;
-    if (!pwallet->GetKeyOrigin(keyID, info)) {
-        throw JSONRPCError(RPC_INTERNAL_ERROR, "Internal keypath is broken");
-    }
-    hd_keypaths.emplace(vchPubKey, std::move(info));
 }
 
 UniValue walletprocesspsbt(const JSONRPCRequest& request)
@@ -4007,8 +3887,8 @@ UniValue walletprocesspsbt(const JSONRPCRequest& request)
     bool sign = request.params[1].isNull() ? true : request.params[1].get_bool();
     bool bip32derivs = request.params[3].isNull() ? false : request.params[3].get_bool();
     bool complete = true;
-    TransactionError err;
-    if (!FillPSBT(pwallet, psbtx, err, complete, nHashType, sign, bip32derivs)) {
+    const TransactionError err = FillPSBT(pwallet, psbtx, complete, nHashType, sign, bip32derivs);
+    if (err != TransactionError::OK) {
         throw JSONRPCTransactionError(err);
     }
 
@@ -4125,8 +4005,8 @@ UniValue walletcreatefundedpsbt(const JSONRPCRequest& request)
     // Fill transaction with out data but don't sign
     bool bip32derivs = request.params[4].isNull() ? false : request.params[4].get_bool();
     bool complete = true;
-    TransactionError err;
-    if (!FillPSBT(pwallet, psbtx, err, complete, 1, false, bip32derivs)) {
+    const TransactionError err = FillPSBT(pwallet, psbtx, complete, 1, false, bip32derivs);
+    if (err != TransactionError::OK) {
         throw JSONRPCTransactionError(err);
     }
 
@@ -4156,8 +4036,6 @@ UniValue importmulti(const JSONRPCRequest& request);
 static const CRPCCommand commands[] =
 { //  category              name                                actor (function)                argNames
     //  --------------------- ------------------------          -----------------------         ----------
-    { "generating",         "generate",                         &generate,                      {"nblocks","maxtries"} },
-    { "hidden",             "resendwallettransactions",         &resendwallettransactions,      {} },
     { "rawtransactions",    "fundrawtransaction",               &fundrawtransaction,            {"hexstring","options","iswitness"} },
     { "wallet",             "abandontransaction",               &abandontransaction,            {"txid"} },
     { "wallet",             "abortrescan",                      &abortrescan,                   {} },
@@ -4215,8 +4093,8 @@ static const CRPCCommand commands[] =
 };
 // clang-format on
 
-void RegisterWalletRPCCommands(CRPCTable &t)
+void RegisterWalletRPCCommands(interfaces::Chain& chain, std::vector<std::unique_ptr<interfaces::Handler>>& handlers)
 {
     for (unsigned int vcidx = 0; vcidx < ARRAYLEN(commands); vcidx++)
-        t.appendCommand(commands[vcidx].name, &commands[vcidx]);
+        handlers.emplace_back(chain.handleRpc(commands[vcidx]));
 }

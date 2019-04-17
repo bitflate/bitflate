@@ -11,6 +11,7 @@
 #include <validation.h>
 #include <policy/policy.h>
 #include <policy/fees.h>
+#include <policy/settings.h>
 #include <reverse_iterator.h>
 #include <streams.h>
 #include <timedata.h>
@@ -764,7 +765,7 @@ std::vector<CTxMemPool::indexed_transaction_set::const_iterator> CTxMemPool::Get
     return iters;
 }
 
-void CTxMemPool::queryHashes(std::vector<uint256>& vtxid)
+void CTxMemPool::queryHashes(std::vector<uint256>& vtxid) const
 {
     LOCK(cs);
     auto iters = GetSortedDepthAndScore();

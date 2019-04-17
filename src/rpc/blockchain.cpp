@@ -1,5 +1,5 @@
 // Copyright (c) 2010 Satoshi Nakamoto
-// Copyright (c) 2009-2018 The Bitcoin Core developers
+// Copyright (c) 2009-2019 The Bitcoin Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -29,6 +29,7 @@
 #include <txmempool.h>
 #include <util/strencodings.h>
 #include <util/system.h>
+#include <util/validation.h>
 #include <validation.h>
 #include <validationinterface.h>
 #include <versionbitsinfo.h>
@@ -378,7 +379,9 @@ static UniValue getdifficulty(const JSONRPCRequest& request)
 
 static std::string EntryDescriptionString()
 {
-    return "    \"size\" : n,             (numeric) virtual transaction size as defined in BIP 141. This is different from actual serialized size for witness transactions as witness data is discounted.\n"
+    return "    \"vsize\" : n,            (numeric) virtual transaction size as defined in BIP 141. This is different from actual serialized size for witness transactions as witness data is discounted.\n"
+           "    \"size\" : n,             (numeric) (DEPRECATED) same as vsize. Only returned if bitcoind is started with -deprecatedrpc=size\n"
+           "                              size will be completely removed in v0.20.\n"
            "    \"fee\" : n,              (numeric) transaction fee in " + CURRENCY_UNIT + " (DEPRECATED)\n"
            "    \"modifiedfee\" : n,      (numeric) transaction fee with fee deltas used for mining priority (DEPRECATED)\n"
            "    \"time\" : n,             (numeric) local time transaction entered pool in seconds since 1 Jan 1970 GMT\n"
@@ -405,9 +408,9 @@ static std::string EntryDescriptionString()
            "    \"bip125-replaceable\" : true|false,  (boolean) Whether this transaction could be replaced due to BIP125 (replace-by-fee)\n";
 }
 
-static void entryToJSON(UniValue &info, const CTxMemPoolEntry &e) EXCLUSIVE_LOCKS_REQUIRED(::mempool.cs)
+static void entryToJSON(const CTxMemPool& pool, UniValue& info, const CTxMemPoolEntry& e) EXCLUSIVE_LOCKS_REQUIRED(pool.cs)
 {
-    AssertLockHeld(mempool.cs);
+    AssertLockHeld(pool.cs);
 
     UniValue fees(UniValue::VOBJ);
     fees.pushKV("base", ValueFromAmount(e.GetFee()));
@@ -416,7 +419,8 @@ static void entryToJSON(UniValue &info, const CTxMemPoolEntry &e) EXCLUSIVE_LOCK
     fees.pushKV("descendant", ValueFromAmount(e.GetModFeesWithDescendants()));
     info.pushKV("fees", fees);
 
-    info.pushKV("size", (int)e.GetTxSize());
+    info.pushKV("vsize", (int)e.GetTxSize());
+    if (IsDeprecatedRPCEnabled("size")) info.pushKV("size", (int)e.GetTxSize());
     info.pushKV("fee", ValueFromAmount(e.GetFee()));
     info.pushKV("modifiedfee", ValueFromAmount(e.GetModifiedFee()));
     info.pushKV("time", e.GetTime());
@@ -427,12 +431,12 @@ static void entryToJSON(UniValue &info, const CTxMemPoolEntry &e) EXCLUSIVE_LOCK
     info.pushKV("ancestorcount", e.GetCountWithAncestors());
     info.pushKV("ancestorsize", e.GetSizeWithAncestors());
     info.pushKV("ancestorfees", e.GetModFeesWithAncestors());
-    info.pushKV("wtxid", mempool.vTxHashes[e.vTxHashesIdx].first.ToString());
+    info.pushKV("wtxid", pool.vTxHashes[e.vTxHashesIdx].first.ToString());
     const CTransaction& tx = e.GetTx();
     std::set<std::string> setDepends;
     for (const CTxIn& txin : tx.vin)
     {
-        if (mempool.exists(txin.prevout.hash))
+        if (pool.exists(txin.prevout.hash))
             setDepends.insert(txin.prevout.hash.ToString());
     }
 
@@ -445,8 +449,8 @@ static void entryToJSON(UniValue &info, const CTxMemPoolEntry &e) EXCLUSIVE_LOCK
     info.pushKV("depends", depends);
 
     UniValue spent(UniValue::VARR);
-    const CTxMemPool::txiter &it = mempool.mapTx.find(tx.GetHash());
-    const CTxMemPool::setEntries &setChildren = mempool.GetMemPoolChildren(it);
+    const CTxMemPool::txiter& it = pool.mapTx.find(tx.GetHash());
+    const CTxMemPool::setEntries& setChildren = pool.GetMemPoolChildren(it);
     for (CTxMemPool::txiter childiter : setChildren) {
         spent.push_back(childiter->GetTx().GetHash().ToString());
     }
@@ -455,7 +459,7 @@ static void entryToJSON(UniValue &info, const CTxMemPoolEntry &e) EXCLUSIVE_LOCK
 
     // Add opt-in RBF status
     bool rbfStatus = false;
-    RBFTransactionState rbfState = IsRBFOptIn(tx, mempool);
+    RBFTransactionState rbfState = IsRBFOptIn(tx, pool);
     if (rbfState == RBFTransactionState::UNKNOWN) {
         throw JSONRPCError(RPC_MISC_ERROR, "Transaction is not in mempool");
     } else if (rbfState == RBFTransactionState::REPLACEABLE_BIP125) {
@@ -465,25 +469,21 @@ static void entryToJSON(UniValue &info, const CTxMemPoolEntry &e) EXCLUSIVE_LOCK
     info.pushKV("bip125-replaceable", rbfStatus);
 }
 
-UniValue mempoolToJSON(bool fVerbose)
+UniValue MempoolToJSON(const CTxMemPool& pool, bool verbose)
 {
-    if (fVerbose)
-    {
-        LOCK(mempool.cs);
+    if (verbose) {
+        LOCK(pool.cs);
         UniValue o(UniValue::VOBJ);
-        for (const CTxMemPoolEntry& e : mempool.mapTx)
-        {
+        for (const CTxMemPoolEntry& e : pool.mapTx) {
             const uint256& hash = e.GetTx().GetHash();
             UniValue info(UniValue::VOBJ);
-            entryToJSON(info, e);
+            entryToJSON(pool, info, e);
             o.pushKV(hash.ToString(), info);
         }
         return o;
-    }
-    else
-    {
+    } else {
         std::vector<uint256> vtxid;
-        mempool.queryHashes(vtxid);
+        pool.queryHashes(vtxid);
 
         UniValue a(UniValue::VARR);
         for (const uint256& hash : vtxid)
@@ -525,7 +525,7 @@ static UniValue getrawmempool(const JSONRPCRequest& request)
     if (!request.params[0].isNull())
         fVerbose = request.params[0].get_bool();
 
-    return mempoolToJSON(fVerbose);
+    return MempoolToJSON(::mempool, fVerbose);
 }
 
 static UniValue getmempoolancestors(const JSONRPCRequest& request)
@@ -591,7 +591,7 @@ static UniValue getmempoolancestors(const JSONRPCRequest& request)
             const CTxMemPoolEntry &e = *ancestorIt;
             const uint256& _hash = e.GetTx().GetHash();
             UniValue info(UniValue::VOBJ);
-            entryToJSON(info, e);
+            entryToJSON(::mempool, info, e);
             o.pushKV(_hash.ToString(), info);
         }
         return o;
@@ -661,7 +661,7 @@ static UniValue getmempooldescendants(const JSONRPCRequest& request)
             const CTxMemPoolEntry &e = *descendantIt;
             const uint256& _hash = e.GetTx().GetHash();
             UniValue info(UniValue::VOBJ);
-            entryToJSON(info, e);
+            entryToJSON(::mempool, info, e);
             o.pushKV(_hash.ToString(), info);
         }
         return o;
@@ -700,7 +700,7 @@ static UniValue getmempoolentry(const JSONRPCRequest& request)
 
     const CTxMemPoolEntry &e = *it;
     UniValue info(UniValue::VOBJ);
-    entryToJSON(info, e);
+    entryToJSON(::mempool, info, e);
     return info;
 }
 
@@ -1485,15 +1485,15 @@ static UniValue getchaintips(const JSONRPCRequest& request)
     return res;
 }
 
-UniValue mempoolInfoToJSON()
+UniValue MempoolInfoToJSON(const CTxMemPool& pool)
 {
     UniValue ret(UniValue::VOBJ);
-    ret.pushKV("size", (int64_t) mempool.size());
-    ret.pushKV("bytes", (int64_t) mempool.GetTotalTxSize());
-    ret.pushKV("usage", (int64_t) mempool.DynamicMemoryUsage());
+    ret.pushKV("size", (int64_t)pool.size());
+    ret.pushKV("bytes", (int64_t)pool.GetTotalTxSize());
+    ret.pushKV("usage", (int64_t)pool.DynamicMemoryUsage());
     size_t maxmempool = gArgs.GetArg("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE) * 1000000;
     ret.pushKV("maxmempool", (int64_t) maxmempool);
-    ret.pushKV("mempoolminfee", ValueFromAmount(std::max(mempool.GetMinFee(maxmempool), ::minRelayTxFee).GetFeePerK()));
+    ret.pushKV("mempoolminfee", ValueFromAmount(std::max(pool.GetMinFee(maxmempool), ::minRelayTxFee).GetFeePerK()));
     ret.pushKV("minrelaytxfee", ValueFromAmount(::minRelayTxFee.GetFeePerK()));
 
     return ret;
@@ -1522,7 +1522,7 @@ static UniValue getmempoolinfo(const JSONRPCRequest& request)
                 },
             }.ToString());
 
-    return mempoolInfoToJSON();
+    return MempoolInfoToJSON(::mempool);
 }
 
 static UniValue preciousblock(const JSONRPCRequest& request)
@@ -1583,15 +1583,15 @@ static UniValue invalidateblock(const JSONRPCRequest& request)
     uint256 hash(ParseHashV(request.params[0], "blockhash"));
     CValidationState state;
 
+    CBlockIndex* pblockindex;
     {
         LOCK(cs_main);
-        CBlockIndex* pblockindex = LookupBlockIndex(hash);
+        pblockindex = LookupBlockIndex(hash);
         if (!pblockindex) {
             throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Block not found");
         }
-
-        InvalidateBlock(state, Params(), pblockindex);
     }
+    InvalidateBlock(state, Params(), pblockindex);
 
     if (state.IsValid()) {
         ActivateBestChain(state, Params());
@@ -1778,9 +1778,7 @@ static constexpr size_t PER_UTXO_OVERHEAD = sizeof(COutPoint) + sizeof(uint32_t)
 
 static UniValue getblockstats(const JSONRPCRequest& request)
 {
-    if (request.fHelp || request.params.size() < 1 || request.params.size() > 4) {
-        throw std::runtime_error(
-            RPCHelpMan{"getblockstats",
+    const RPCHelpMan help{"getblockstats",
                 "\nCompute per block statistics for a given window. All amounts are in satoshis.\n"
                 "It won't work for some heights with pruning.\n"
                 "It won't work without -txindex for utxo_size_inc, *fee or *feerate stats.\n",
@@ -1836,7 +1834,9 @@ static UniValue getblockstats(const JSONRPCRequest& request)
                     HelpExampleCli("getblockstats", "1000 '[\"minfeerate\",\"avgfeerate\"]'")
             + HelpExampleRpc("getblockstats", "1000 '[\"minfeerate\",\"avgfeerate\"]'")
                 },
-            }.ToString());
+    };
+    if (request.fHelp || !help.IsValidNumArgs(request.params.size())) {
+        throw std::runtime_error(help.ToString());
     }
 
     LOCK(cs_main);
@@ -2159,7 +2159,7 @@ UniValue scantxoutset(const JSONRPCRequest& request)
                             {"", RPCArg::Type::OBJ, RPCArg::Optional::OMITTED, "An object with output descriptor and metadata",
                                 {
                                     {"desc", RPCArg::Type::STR, RPCArg::Optional::NO, "An output descriptor"},
-                                    {"range", RPCArg::Type::NUM, /* default */ "1000", "Up to what child index HD chains should be explored"},
+                                    {"range", RPCArg::Type::RANGE, /* default */ "1000", "The range of HD chain indexes to explore (either end or [begin,end])"},
                                 },
                             },
                         },
@@ -2216,7 +2216,7 @@ UniValue scantxoutset(const JSONRPCRequest& request)
         // loop through the scan objects
         for (const UniValue& scanobject : request.params[1].get_array().getValues()) {
             std::string desc_str;
-            int range = 1000;
+            std::pair<int64_t, int64_t> range = {0, 1000};
             if (scanobject.isStr()) {
                 desc_str = scanobject.get_str();
             } else if (scanobject.isObject()) {
@@ -2225,8 +2225,8 @@ UniValue scantxoutset(const JSONRPCRequest& request)
                 desc_str = desc_uni.get_str();
                 UniValue range_uni = find_value(scanobject, "range");
                 if (!range_uni.isNull()) {
-                    range = range_uni.get_int();
-                    if (range < 0 || range > 1000000) throw JSONRPCError(RPC_INVALID_PARAMETER, "range out of range");
+                    range = ParseRange(range_uni);
+                    if (range.first < 0 || (range.second >> 31) != 0 || range.second >= range.first + 1000000) throw JSONRPCError(RPC_INVALID_PARAMETER, "range out of range");
                 }
             } else {
                 throw JSONRPCError(RPC_INVALID_PARAMETER, "Scan object needs to be either a string or an object");
@@ -2237,8 +2237,11 @@ UniValue scantxoutset(const JSONRPCRequest& request)
             if (!desc) {
                 throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, strprintf("Invalid descriptor '%s'", desc_str));
             }
-            if (!desc->IsRange()) range = 0;
-            for (int i = 0; i <= range; ++i) {
+            if (!desc->IsRange()) {
+                range.first = 0;
+                range.second = 0;
+            }
+            for (int i = range.first; i <= range.second; ++i) {
                 std::vector<CScript> scripts;
                 if (!desc->Expand(i, provider, scripts, provider)) {
                     throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, strprintf("Cannot derive script without private keys: '%s'", desc_str));

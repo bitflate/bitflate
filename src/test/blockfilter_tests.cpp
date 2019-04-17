@@ -1,9 +1,9 @@
-// Copyright (c) 2018 The Bitcoin Core developers
+// Copyright (c) 2018-2019 The Bitcoin Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include <test/data/blockfilters.json.h>
-#include <test/test_bitcoin.h>
+#include <test/setup_common.h>
 
 #include <blockfilter.h>
 #include <core_io.h>
@@ -112,6 +112,12 @@ BOOST_AUTO_TEST_CASE(blockfilter_basic_test)
     BOOST_CHECK_EQUAL(block_filter.GetFilterType(), block_filter2.GetFilterType());
     BOOST_CHECK_EQUAL(block_filter.GetBlockHash(), block_filter2.GetBlockHash());
     BOOST_CHECK(block_filter.GetEncodedFilter() == block_filter2.GetEncodedFilter());
+
+    BlockFilter default_ctor_block_filter_1;
+    BlockFilter default_ctor_block_filter_2;
+    BOOST_CHECK_EQUAL(default_ctor_block_filter_1.GetFilterType(), default_ctor_block_filter_2.GetFilterType());
+    BOOST_CHECK_EQUAL(default_ctor_block_filter_1.GetBlockHash(), default_ctor_block_filter_2.GetBlockHash());
+    BOOST_CHECK(default_ctor_block_filter_1.GetEncodedFilter() == default_ctor_block_filter_2.GetEncodedFilter());
 }
 
 BOOST_AUTO_TEST_CASE(blockfilters_json_test)

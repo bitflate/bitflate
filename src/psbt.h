@@ -1,4 +1,4 @@
-// Copyright (c) 2009-2018 The Bitcoin Core developers
+// Copyright (c) 2009-2019 The Bitcoin Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -7,6 +7,8 @@
 
 #include <attributes.h>
 #include <node/transaction.h>
+#include <optional.h>
+#include <policy/feerate.h>
 #include <primitives/transaction.h>
 #include <pubkey.h>
 #include <script/sign.h>
@@ -548,8 +550,17 @@ struct PartiallySignedTransaction
     }
 };
 
+enum class PSBTRole {
+    UPDATER,
+    SIGNER,
+    FINALIZER,
+    EXTRACTOR
+};
+
+std::string PSBTRoleName(PSBTRole role);
+
 /** Checks whether a PSBTInput is already signed. */
-bool PSBTInputSigned(PSBTInput& input);
+bool PSBTInputSigned(const PSBTInput& input);
 
 /** Signs a PSBTInput, verifying that all provided data matches what is being signed. */
 bool SignPSBTInput(const SigningProvider& provider, PartiallySignedTransaction& psbt, int index, int sighash = SIGHASH_ALL, SignatureData* out_sigdata = nullptr, bool use_dummy = false);
@@ -575,10 +586,14 @@ bool FinalizeAndExtractPSBT(PartiallySignedTransaction& psbtx, CMutableTransacti
  * Combines PSBTs with the same underlying transaction, resulting in a single PSBT with all partial signatures from each input.
  *
  * @param[out] &out   the combined PSBT, if successful
- * @param[out] &error reference to TransactionError to fill with error info on failure
  * @param[in]  psbtxs the PSBTs to combine
- * @return True if we successfully combined the transactions, false if they were not compatible
+ * @return error (OK if we successfully combined the transactions, other error if they were not compatible)
  */
-bool CombinePSBTs(PartiallySignedTransaction& out, TransactionError& error, const std::vector<PartiallySignedTransaction>& psbtxs);
+NODISCARD TransactionError CombinePSBTs(PartiallySignedTransaction& out, const std::vector<PartiallySignedTransaction>& psbtxs);
+
+//! Decode a base64ed PSBT into a PartiallySignedTransaction
+NODISCARD bool DecodeBase64PSBT(PartiallySignedTransaction& decoded_psbt, const std::string& base64_psbt, std::string& error);
+//! Decode a raw (binary blob) PSBT into a PartiallySignedTransaction
+NODISCARD bool DecodeRawPSBT(PartiallySignedTransaction& decoded_psbt, const std::string& raw_psbt, std::string& error);
 
 #endif // BITCOIN_PSBT_H

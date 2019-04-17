@@ -1,8 +1,8 @@
-// Copyright (c) 2011-2018 The Bitcoin Core developers
+// Copyright (c) 2011-2019 The Bitcoin Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-#include <test/test_bitcoin.h>
+#include <test/setup_common.h>
 
 #include <banman.h>
 #include <chainparams.h>
@@ -19,6 +19,7 @@
 #include <script/sigcache.h>
 #include <streams.h>
 #include <ui_interface.h>
+#include <util/validation.h>
 #include <validation.h>
 
 const std::function<std::string(const char*)> G_TRANSLATION_FUN = nullptr;
@@ -32,7 +33,7 @@ std::ostream& operator<<(std::ostream& os, const uint256& num)
 }
 
 BasicTestingSetup::BasicTestingSetup(const std::string& chainName)
-    : m_path_root(fs::temp_directory_path() / "test_bitcoin" / strprintf("%lu_%i", (unsigned long)GetTime(), (int)(InsecureRandRange(1 << 30))))
+    : m_path_root(fs::temp_directory_path() / "test_common_" PACKAGE_NAME / strprintf("%lu_%i", (unsigned long)GetTime(), (int)(InsecureRandRange(1 << 30))))
 {
     SHA256AutoDetect();
     ECC_Start();
@@ -41,11 +42,12 @@ BasicTestingSetup::BasicTestingSetup(const std::string& chainName)
     InitSignatureCache();
     InitScriptExecutionCache();
     fCheckBlockIndex = true;
-    // CreateAndProcessBlock() does not support building SegWit blocks, so don't activate in these tests.
-    // TODO: fix the code to support SegWit blocks.
-    gArgs.ForceSetArg("-vbparams", strprintf("segwit:0:%d", (int64_t)Consensus::BIP9Deployment::NO_TIMEOUT));
     SelectParams(chainName);
-    noui_connect();
+    static bool noui_connected = false;
+    if (!noui_connected) {
+        noui_connect();
+        noui_connected = true;
+    }
 }
 
 BasicTestingSetup::~BasicTestingSetup()
@@ -66,36 +68,36 @@ TestingSetup::TestingSetup(const std::string& chainName) : BasicTestingSetup(cha
 {
     SetDataDir("tempdir");
     const CChainParams& chainparams = Params();
-        // Ideally we'd move all the RPC tests to the functional testing framework
-        // instead of unit tests, but for now we need these here.
+    // Ideally we'd move all the RPC tests to the functional testing framework
+    // instead of unit tests, but for now we need these here.
 
-        RegisterAllCoreRPCCommands(tableRPC);
-        ClearDatadirCache();
+    RegisterAllCoreRPCCommands(tableRPC);
+    ClearDatadirCache();
 
-        // We have to run a scheduler thread to prevent ActivateBestChain
-        // from blocking due to queue overrun.
-        threadGroup.create_thread(std::bind(&CScheduler::serviceQueue, &scheduler));
-        GetMainSignals().RegisterBackgroundSignalScheduler(scheduler);
+    // We have to run a scheduler thread to prevent ActivateBestChain
+    // from blocking due to queue overrun.
+    threadGroup.create_thread(std::bind(&CScheduler::serviceQueue, &scheduler));
+    GetMainSignals().RegisterBackgroundSignalScheduler(scheduler);
 
-        mempool.setSanityCheck(1.0);
-        pblocktree.reset(new CBlockTreeDB(1 << 20, true));
-        pcoinsdbview.reset(new CCoinsViewDB(1 << 23, true));
-        pcoinsTip.reset(new CCoinsViewCache(pcoinsdbview.get()));
-        if (!LoadGenesisBlock(chainparams)) {
-            throw std::runtime_error("LoadGenesisBlock failed.");
-        }
-        {
-            CValidationState state;
-            if (!ActivateBestChain(state, chainparams)) {
-                throw std::runtime_error(strprintf("ActivateBestChain failed. (%s)", FormatStateMessage(state)));
-            }
-        }
-        nScriptCheckThreads = 3;
-        for (int i=0; i < nScriptCheckThreads-1; i++)
-            threadGroup.create_thread(&ThreadScriptCheck);
+    mempool.setSanityCheck(1.0);
+    pblocktree.reset(new CBlockTreeDB(1 << 20, true));
+    pcoinsdbview.reset(new CCoinsViewDB(1 << 23, true));
+    pcoinsTip.reset(new CCoinsViewCache(pcoinsdbview.get()));
+    if (!LoadGenesisBlock(chainparams)) {
+        throw std::runtime_error("LoadGenesisBlock failed.");
+    }
 
-        g_banman = MakeUnique<BanMan>(GetDataDir() / "banlist.dat", nullptr, DEFAULT_MISBEHAVING_BANTIME);
-        g_connman = MakeUnique<CConnman>(0x1337, 0x1337); // Deterministic randomness for tests.
+    CValidationState state;
+    if (!ActivateBestChain(state, chainparams)) {
+        throw std::runtime_error(strprintf("ActivateBestChain failed. (%s)", FormatStateMessage(state)));
+    }
+
+    nScriptCheckThreads = 3;
+    for (int i = 0; i < nScriptCheckThreads - 1; i++)
+        threadGroup.create_thread(&ThreadScriptCheck);
+
+    g_banman = MakeUnique<BanMan>(GetDataDir() / "banlist.dat", nullptr, DEFAULT_MISBEHAVING_BANTIME);
+    g_connman = MakeUnique<CConnman>(0x1337, 0x1337); // Deterministic randomness for tests.
 }
 
 TestingSetup::~TestingSetup()
@@ -114,6 +116,11 @@ TestingSetup::~TestingSetup()
 
 TestChain100Setup::TestChain100Setup() : TestingSetup(CBaseChainParams::REGTEST)
 {
+    // CreateAndProcessBlock() does not support building SegWit blocks, so don't activate in these tests.
+    // TODO: fix the code to support SegWit blocks.
+    gArgs.ForceSetArg("-vbparams", strprintf("segwit:0:%d", (int64_t)Consensus::BIP9Deployment::NO_TIMEOUT));
+    SelectParams(CBaseChainParams::REGTEST);
+
     // Generate a 100-block chain:
     coinbaseKey.MakeNewKey(true);
     CScript scriptPubKey = CScript() <<  ToByteVector(coinbaseKey.GetPubKey()) << OP_CHECKSIG;

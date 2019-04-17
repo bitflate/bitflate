@@ -22,6 +22,7 @@
   <ItemGroup>
     <ClCompile Include="..\..\src\arith_uint256.cpp" />
     <ClCompile Include="..\..\src\consensus\merkle.cpp" />
+    <ClCompile Include="..\..\src\consensus\tx_check.cpp" />
     <ClCompile Include="..\..\src\crypto\aes.cpp" />
     <ClCompile Include="..\..\src\crypto\chacha20.cpp" />
     <ClCompile Include="..\..\src\crypto\hmac_sha256.cpp" />
@@ -126,7 +127,6 @@
       <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <SDLCheck>false</SDLCheck>
-      <AdditionalIncludeDirectories>..\..\src;..\..\src\secp256k1\include;</AdditionalIncludeDirectories>
       <ExceptionHandling>Sync</ExceptionHandling>
       <SuppressStartupBanner>false</SuppressStartupBanner>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
@@ -143,7 +143,6 @@
       <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <SDLCheck>false</SDLCheck>
-      <AdditionalIncludeDirectories>..\..\src;..\..\src\secp256k1\include;</AdditionalIncludeDirectories>
       <ExceptionHandling>Sync</ExceptionHandling>
       <SuppressStartupBanner>false</SuppressStartupBanner>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
@@ -162,7 +161,6 @@
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <PreprocessorDefinitions>WIN32;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <SDLCheck>false</SDLCheck>
-      <AdditionalIncludeDirectories>..\..\src;..\..\src\secp256k1\include;</AdditionalIncludeDirectories>
       <ExceptionHandling>Sync</ExceptionHandling>
       <SuppressStartupBanner>false</SuppressStartupBanner>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
@@ -183,7 +181,6 @@
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <PreprocessorDefinitions>WIN32;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <SDLCheck>false</SDLCheck>
-      <AdditionalIncludeDirectories>..\..\src;..\..\src\secp256k1\include;</AdditionalIncludeDirectories>
       <ExceptionHandling>Sync</ExceptionHandling>
       <SuppressStartupBanner>false</SuppressStartupBanner>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>

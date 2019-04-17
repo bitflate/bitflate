@@ -28,7 +28,7 @@ static const CAmount COIN = 100000000;
  * Bitcoin default is 21000000 * COIN. We remove this limit because the coin
  * inflates.
  * */
-static const CAmount MAX_MONEY = LLONG_MAX;
+static const CAmount MAX_MONEY = LLONG_MAX - 1;
 inline bool MoneyRange(const CAmount& nValue) { return (nValue >= 0 && nValue <= MAX_MONEY); }
 
 #endif //  BITCOIN_AMOUNT_H

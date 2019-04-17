@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Copyright (c) 2017-2018 The Bitcoin Core developers
+# Copyright (c) 2017-2019 The Bitcoin Core developers
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
 """Class for bitcoind node under test"""
@@ -31,9 +31,6 @@ from .util import (
     p2p_port,
 )
 
-# For Python 3.4 compatibility
-JSONDecodeError = getattr(json, "JSONDecodeError", ValueError)
-
 BITCOIND_PROC_WAIT_TIMEOUT = 60
 
 
@@ -61,7 +58,7 @@ class TestNode():
     To make things easier for the test writer, any unrecognised messages will
     be dispatched to the RPC connection."""
 
-    def __init__(self, i, datadir, *, rpchost, timewait, bitcoind, bitcoin_cli, mocktime, coverage_dir, cwd, extra_conf=None, extra_args=None, use_cli=False, start_perf=False):
+    def __init__(self, i, datadir, *, rpchost, timewait, bitcoind, bitcoin_cli, coverage_dir, cwd, extra_conf=None, extra_args=None, use_cli=False, start_perf=False):
         """
         Kwargs:
             start_perf (bool): If True, begin profiling the node with `perf` as soon as
@@ -90,8 +87,7 @@ class TestNode():
             "-debug",
             "-debugexclude=libevent",
             "-debugexclude=leveldb",
-            "-mocktime=" + str(mocktime),
-            "-uacomment=testnode%d" % i
+            "-uacomment=testnode%d" % i,
         ]
 
         self.cli = TestNodeCLI(bitcoin_cli, self.datadir)
@@ -373,7 +369,7 @@ class TestNode():
                 stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL) == 0
 
         if not sys.platform.startswith('linux'):
-            self.log.warning("Can't profile with perf; only availabe on Linux platforms")
+            self.log.warning("Can't profile with perf; only available on Linux platforms")
             return None
 
         if not test_success('which perf'):
@@ -566,5 +562,5 @@ class TestNodeCLI():
             raise subprocess.CalledProcessError(returncode, self.binary, output=cli_stderr)
         try:
             return json.loads(cli_stdout, parse_float=decimal.Decimal)
-        except JSONDecodeError:
+        except json.JSONDecodeError:
             return cli_stdout.rstrip("\n")

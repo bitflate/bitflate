@@ -1,4 +1,4 @@
-// Copyright (c) 2011-2018 The Bitcoin Core developers
+// Copyright (c) 2011-2019 The Bitcoin Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -9,7 +9,7 @@
 #include <sync.h>
 #include <util/strencodings.h>
 #include <util/moneystr.h>
-#include <test/test_bitcoin.h>
+#include <test/setup_common.h>
 
 #include <stdint.h>
 #include <vector>
@@ -36,8 +36,10 @@ BOOST_AUTO_TEST_CASE(util_criticalsection)
 
     do {
         TRY_LOCK(cs, lockTest);
-        if (lockTest)
+        if (lockTest) {
+            BOOST_CHECK(true); // Needed to suppress "Test case [...] did not check any assertions"
             break;
+        }
 
         BOOST_ERROR("break was swallowed!");
     } while(0);
@@ -78,32 +80,15 @@ BOOST_AUTO_TEST_CASE(util_HexStr)
         "04678afdb0fe5548271967f1a67130b7105cd6a828e03909a67962e0ea1f61deb649f6bc3f4cef38c4f35504e51ec112de5c384df7ba0b8d578a4c702b6bf11d5f");
 
     BOOST_CHECK_EQUAL(
-        HexStr(ParseHex_expected, ParseHex_expected + 5, true),
-        "04 67 8a fd b0");
-
-    BOOST_CHECK_EQUAL(
         HexStr(ParseHex_expected + sizeof(ParseHex_expected),
                ParseHex_expected + sizeof(ParseHex_expected)),
-        "");
-
-    BOOST_CHECK_EQUAL(
-        HexStr(ParseHex_expected + sizeof(ParseHex_expected),
-               ParseHex_expected + sizeof(ParseHex_expected), true),
         "");
 
     BOOST_CHECK_EQUAL(
         HexStr(ParseHex_expected, ParseHex_expected),
         "");
 
-    BOOST_CHECK_EQUAL(
-        HexStr(ParseHex_expected, ParseHex_expected, true),
-        "");
-
     std::vector<unsigned char> ParseHex_vec(ParseHex_expected, ParseHex_expected + 5);
-
-    BOOST_CHECK_EQUAL(
-        HexStr(ParseHex_vec, true),
-        "04 67 8a fd b0");
 
     BOOST_CHECK_EQUAL(
         HexStr(ParseHex_vec.rbegin(), ParseHex_vec.rend()),
@@ -111,31 +96,14 @@ BOOST_AUTO_TEST_CASE(util_HexStr)
     );
 
     BOOST_CHECK_EQUAL(
-        HexStr(ParseHex_vec.rbegin(), ParseHex_vec.rend(), true),
-        "b0 fd 8a 67 04"
-    );
-
-    BOOST_CHECK_EQUAL(
         HexStr(std::reverse_iterator<const uint8_t *>(ParseHex_expected),
                std::reverse_iterator<const uint8_t *>(ParseHex_expected)),
         ""
     );
 
     BOOST_CHECK_EQUAL(
-        HexStr(std::reverse_iterator<const uint8_t *>(ParseHex_expected),
-               std::reverse_iterator<const uint8_t *>(ParseHex_expected), true),
-        ""
-    );
-
-    BOOST_CHECK_EQUAL(
         HexStr(std::reverse_iterator<const uint8_t *>(ParseHex_expected + 1),
                std::reverse_iterator<const uint8_t *>(ParseHex_expected)),
-        "04"
-    );
-
-    BOOST_CHECK_EQUAL(
-        HexStr(std::reverse_iterator<const uint8_t *>(ParseHex_expected + 1),
-               std::reverse_iterator<const uint8_t *>(ParseHex_expected), true),
         "04"
     );
 
@@ -143,12 +111,6 @@ BOOST_AUTO_TEST_CASE(util_HexStr)
         HexStr(std::reverse_iterator<const uint8_t *>(ParseHex_expected + 5),
                std::reverse_iterator<const uint8_t *>(ParseHex_expected)),
         "b0fd8a6704"
-    );
-
-    BOOST_CHECK_EQUAL(
-        HexStr(std::reverse_iterator<const uint8_t *>(ParseHex_expected + 5),
-               std::reverse_iterator<const uint8_t *>(ParseHex_expected), true),
-        "b0 fd 8a 67 04"
     );
 
     BOOST_CHECK_EQUAL(
@@ -180,9 +142,10 @@ struct TestArgsManager : public ArgsManager
         {
             LOCK(cs_args);
             m_config_args.clear();
+            m_config_sections.clear();
         }
         std::string error;
-        BOOST_REQUIRE(ReadConfigStream(streamConfig, error));
+        BOOST_REQUIRE(ReadConfigStream(streamConfig, "", error));
     }
     void SetNetworkOnlyArg(const std::string arg)
     {

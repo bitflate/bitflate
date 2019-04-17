@@ -8,7 +8,7 @@
 #include <amount.h>
 #include <primitives/transaction.h>
 #include <random.h>
-#include <test/test_bitcoin.h>
+#include <test/setup_common.h>
 #include <wallet/test/wallet_test_fixture.h>
 
 #include <boost/test/unit_test.hpp>
@@ -29,7 +29,7 @@ typedef std::set<CInputCoin> CoinSet;
 
 static std::vector<COutput> vCoins;
 static auto testChain = interfaces::MakeChain();
-static CWallet testWallet(*testChain, WalletLocation(), WalletDatabase::CreateDummy());
+static CWallet testWallet(testChain.get(), WalletLocation(), WalletDatabase::CreateDummy());
 static CAmount balance = 0;
 
 CoinEligibilityFilter filter_standard(1, 6, 0);
@@ -135,7 +135,6 @@ BOOST_AUTO_TEST_CASE(bnb_search_test)
     /////////////////////////
     // Known Outcome tests //
     /////////////////////////
-    BOOST_TEST_MESSAGE("Testing known outcomes");
 
     // Empty utxo pool
     BOOST_CHECK(!SelectCoinsBnB(GroupCoins(utxo_pool), 1 * CENT, 0.5 * CENT, selection, value_ret, not_input_fees));

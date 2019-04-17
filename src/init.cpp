@@ -31,6 +31,7 @@
 #include <policy/feerate.h>
 #include <policy/fees.h>
 #include <policy/policy.h>
+#include <policy/settings.h>
 #include <rpc/server.h>
 #include <rpc/register.h>
 #include <rpc/blockchain.h>
@@ -46,6 +47,7 @@
 #include <ui_interface.h>
 #include <util/system.h>
 #include <util/moneystr.h>
+#include <util/validation.h>
 #include <validationinterface.h>
 #include <warnings.h>
 #include <walletinitinterface.h>
@@ -53,6 +55,8 @@
 #include <stdio.h>
 
 #ifndef WIN32
+#include <attributes.h>
+#include <cerrno>
 #include <signal.h>
 #include <sys/stat.h>
 #endif
@@ -91,6 +95,32 @@ std::unique_ptr<BanMan> g_banman;
 #endif
 
 static const char* FEE_ESTIMATES_FILENAME="fee_estimates.dat";
+
+/**
+ * The PID file facilities.
+ */
+static const char* BITCOIN_PID_FILENAME = "bitcoind.pid";
+
+static fs::path GetPidFile()
+{
+    return AbsPathForConfigVal(fs::path(gArgs.GetArg("-pid", BITCOIN_PID_FILENAME)));
+}
+
+NODISCARD static bool CreatePidFile()
+{
+    FILE* file = fsbridge::fopen(GetPidFile(), "w");
+    if (file) {
+#ifdef WIN32
+        fprintf(file, "%d\n", GetCurrentProcessId());
+#else
+        fprintf(file, "%d\n", getpid());
+#endif
+        fclose(file);
+        return true;
+    } else {
+        return InitError(strprintf(_("Unable to create the PID file '%s': %s"), GetPidFile().string(), std::strerror(errno)));
+    }
+}
 
 //////////////////////////////////////////////////////////////////////////////
 //
@@ -260,13 +290,13 @@ void Shutdown(InitInterfaces& interfaces)
     }
 #endif
 
-#ifndef WIN32
     try {
-        fs::remove(GetPidFile());
+        if (!fs::remove(GetPidFile())) {
+            LogPrintf("%s: Unable to remove PID file: File does not exist\n", __func__);
+        }
     } catch (const fs::filesystem_error& e) {
-        LogPrintf("%s: Unable to remove pidfile: %s\n", __func__, e.what());
+        LogPrintf("%s: Unable to remove PID file: %s\n", __func__, fsbridge::get_filesystem_error_message(e));
     }
-#endif
     interfaces.chain_clients.clear();
     UnregisterAllValidationInterfaces();
     GetMainSignals().UnregisterBackgroundSignalScheduler();
@@ -352,7 +382,7 @@ void SetupServerArgs()
     gArgs.AddArg("-conf=<file>", strprintf("Specify configuration file. Relative paths will be prefixed by datadir location. (default: %s)", BITCOIN_CONF_FILENAME), false, OptionsCategory::OPTIONS);
     gArgs.AddArg("-datadir=<dir>", "Specify data directory", false, OptionsCategory::OPTIONS);
     gArgs.AddArg("-dbbatchsize", strprintf("Maximum database write batch size in bytes (default: %u)", nDefaultDbBatchSize), true, OptionsCategory::OPTIONS);
-    gArgs.AddArg("-dbcache=<n>", strprintf("Set database cache size in MiB (%d to %d, default: %d)", nMinDbCache, nMaxDbCache, nDefaultDbCache), false, OptionsCategory::OPTIONS);
+    gArgs.AddArg("-dbcache=<n>", strprintf("Maximum database cache size <n> MiB (%d to %d, default: %d). In addition, unused mempool memory is shared for this cache (see -maxmempool).", nMinDbCache, nMaxDbCache, nDefaultDbCache), false, OptionsCategory::OPTIONS);
     gArgs.AddArg("-debuglogfile=<file>", strprintf("Specify location of debug log file. Relative paths will be prefixed by a net-specific datadir location. (-nodebuglogfile to disable; default: %s)", DEFAULT_DEBUGLOGFILE), false, OptionsCategory::OPTIONS);
     gArgs.AddArg("-feefilter", strprintf("Tell other nodes to filter invs to us by our mempool min fee (default: %u)", DEFAULT_FEEFILTER), true, OptionsCategory::OPTIONS);
     gArgs.AddArg("-includeconf=<file>", "Specify additional configuration file, relative to the -datadir path (only useable from configuration file, not command line)", false, OptionsCategory::OPTIONS);
@@ -364,11 +394,7 @@ void SetupServerArgs()
     gArgs.AddArg("-par=<n>", strprintf("Set the number of script verification threads (%u to %d, 0 = auto, <0 = leave that many cores free, default: %d)",
         -GetNumCores(), MAX_SCRIPTCHECK_THREADS, DEFAULT_SCRIPTCHECK_THREADS), false, OptionsCategory::OPTIONS);
     gArgs.AddArg("-persistmempool", strprintf("Whether to save the mempool on shutdown and load on restart (default: %u)", DEFAULT_PERSIST_MEMPOOL), false, OptionsCategory::OPTIONS);
-#ifndef WIN32
     gArgs.AddArg("-pid=<file>", strprintf("Specify pid file. Relative paths will be prefixed by a net-specific datadir location. (default: %s)", BITCOIN_PID_FILENAME), false, OptionsCategory::OPTIONS);
-#else
-    hidden_args.emplace_back("-pid");
-#endif
     gArgs.AddArg("-prune=<n>", strprintf("Reduce storage requirements by enabling pruning (deleting) of old blocks. This allows the pruneblockchain RPC to be called to delete specific blocks, and enables automatic pruning of old blocks if a target size in MiB is provided. This mode is incompatible with -txindex and -rescan. "
             "Warning: Reverting this setting requires re-downloading the entire blockchain. "
             "(default: 0 = disable pruning blocks, 1 = allow manual pruning via RPC, >=%u = automatically prune block files to stay under the specified target size in MiB)", MIN_DISK_SPACE_FOR_BLOCK_FILES / 1024 / 1024), false, OptionsCategory::OPTIONS);
@@ -476,7 +502,7 @@ void SetupServerArgs()
     gArgs.AddArg("-mocktime=<n>", "Replace actual time with <n> seconds since epoch (default: 0)", true, OptionsCategory::DEBUG_TEST);
     gArgs.AddArg("-maxsigcachesize=<n>", strprintf("Limit sum of signature cache and script execution cache sizes to <n> MiB (default: %u)", DEFAULT_MAX_SIG_CACHE_SIZE), true, OptionsCategory::DEBUG_TEST);
     gArgs.AddArg("-maxtipage=<n>", strprintf("Maximum tip age in seconds to consider node in initial block download (default: %u)", DEFAULT_MAX_TIP_AGE), true, OptionsCategory::DEBUG_TEST);
-    gArgs.AddArg("-maxtxfee=<amt>", strprintf("Maximum total fees (in %s) to use in a single wallet transaction or raw transaction; setting this too low may abort large transactions (default: %s)",
+    gArgs.AddArg("-maxtxfee=<amt>", strprintf("Maximum total fees (in %s) to use in a single wallet transaction; setting this too low may abort large transactions (default: %s)", // TODO move setting to wallet
         CURRENCY_UNIT, FormatMoney(DEFAULT_TRANSACTION_MAXFEE)), false, OptionsCategory::DEBUG_TEST);
     gArgs.AddArg("-printpriority", strprintf("Log transaction fee per kB when mining blocks (default: %u)", DEFAULT_PRINTPRIORITY), true, OptionsCategory::DEBUG_TEST);
     gArgs.AddArg("-printtoconsole", "Send trace/debug info to console (default: 1 when no -daemon. To disable logging to file, set -nodebuglogfile)", false, OptionsCategory::DEBUG_TEST);
@@ -644,8 +670,8 @@ static void ThreadImport(std::vector<fs::path> vImportFiles)
     if (fReindex) {
         int nFile = 0;
         while (true) {
-            CDiskBlockPos pos(nFile, 0);
-            if (!fs::exists(GetBlockPosFilename(pos, "blk")))
+            FlatFilePos pos(nFile, 0);
+            if (!fs::exists(GetBlockPosFilename(pos)))
                 break; // No block files left to reindex
             FILE *file = OpenBlockFile(pos, true);
             if (!file)
@@ -804,19 +830,6 @@ void InitParameterInteraction()
         if (gArgs.SoftSetBoolArg("-whitelistrelay", true))
             LogPrintf("%s: parameter interaction: -whitelistforcerelay=1 -> setting -whitelistrelay=1\n", __func__);
     }
-
-    // Warn if network-specific options (-addnode, -connect, etc) are
-    // specified in default section of config file, but not overridden
-    // on the command line or in this network's section of the config file.
-    std::string network = gArgs.GetChainName();
-    for (const auto& arg : gArgs.GetUnsuitableSectionOnlyArgs()) {
-        InitWarning(strprintf(_("Config setting for %s only applied on %s network when in [%s] section."), arg, network, network));
-    }
-
-    // Warn if unrecognized section name are present in the config file.
-    for (const auto& section : gArgs.GetUnrecognizedSections()) {
-        InitWarning(strprintf(_("Section [%s] is not recognized."), section));
-    }
 }
 
 static std::string ResolveErrMsg(const char * const optname, const std::string& strBind)
@@ -925,6 +938,19 @@ bool AppInitParameterInteraction()
     // ********************************************************* Step 2: parameter interactions
 
     // also see: InitParameterInteraction()
+
+    // Warn if network-specific options (-addnode, -connect, etc) are
+    // specified in default section of config file, but not overridden
+    // on the command line or in this network's section of the config file.
+    std::string network = gArgs.GetChainName();
+    for (const auto& arg : gArgs.GetUnsuitableSectionOnlyArgs()) {
+        return InitError(strprintf(_("Config setting for %s only applied on %s network when in [%s] section."), arg, network, network));
+    }
+
+    // Warn if unrecognized section name are present in the config file.
+    for (const auto& section : gArgs.GetUnrecognizedSections()) {
+        InitWarning(strprintf("%s:%i " + _("Section [%s] is not recognized."), section.m_file, section.m_line, section.m_name));
+    }
 
     if (!fs::is_directory(GetBlocksDir())) {
         return InitError(strprintf(_("Specified blocks directory \"%s\" does not exist."), gArgs.GetArg("-blocksdir", "").c_str()));
@@ -1200,9 +1226,10 @@ bool AppInitMain(InitInterfaces& interfaces)
 {
     const CChainParams& chainparams = Params();
     // ********************************************************* Step 4a: application initialization
-#ifndef WIN32
-    CreatePidFile(GetPidFile(), getpid());
-#endif
+    if (!CreatePidFile()) {
+        // Detailed error printed inside CreatePidFile().
+        return false;
+    }
     if (LogInstance().m_print_to_file) {
         if (gArgs.GetBoolArg("-shrinkdebugfile", LogInstance().DefaultShrinkDebugFile())) {
             // Do this first since it both loads a bunch of debug.log into memory,
@@ -1443,11 +1470,11 @@ bool AppInitMain(InitInterfaces& interfaces)
 
         uiInterface.InitMessage(_("Loading block index..."));
 
-        LOCK(cs_main);
-
         do {
             const int64_t load_block_index_start_time = GetTimeMillis();
+            bool is_coinsview_empty;
             try {
+                LOCK(cs_main);
                 UnloadBlockIndex();
                 pcoinsTip.reset();
                 pcoinsdbview.reset();
@@ -1519,7 +1546,7 @@ bool AppInitMain(InitInterfaces& interfaces)
                 // The on-disk coinsdb is now in a good state, create the cache
                 pcoinsTip.reset(new CCoinsViewCache(pcoinscatcher.get()));
 
-                bool is_coinsview_empty = fReset || fReindexChainState || pcoinsTip->GetBestBlock().IsNull();
+                is_coinsview_empty = fReset || fReindexChainState || pcoinsTip->GetBestBlock().IsNull();
                 if (!is_coinsview_empty) {
                     // LoadChainTip sets chainActive based on pcoinsTip's best block
                     if (!LoadChainTip(chainparams)) {
@@ -1528,18 +1555,25 @@ bool AppInitMain(InitInterfaces& interfaces)
                     }
                     assert(chainActive.Tip() != nullptr);
                 }
+            } catch (const std::exception& e) {
+                LogPrintf("%s\n", e.what());
+                strLoadError = _("Error opening block database");
+                break;
+            }
 
-                if (!fReset) {
-                    // Note that RewindBlockIndex MUST run even if we're about to -reindex-chainstate.
-                    // It both disconnects blocks based on chainActive, and drops block data in
-                    // mapBlockIndex based on lack of available witness data.
-                    uiInterface.InitMessage(_("Rewinding blocks..."));
-                    if (!RewindBlockIndex(chainparams)) {
-                        strLoadError = _("Unable to rewind the database to a pre-fork state. You will need to redownload the blockchain");
-                        break;
-                    }
+            if (!fReset) {
+                // Note that RewindBlockIndex MUST run even if we're about to -reindex-chainstate.
+                // It both disconnects blocks based on chainActive, and drops block data in
+                // mapBlockIndex based on lack of available witness data.
+                uiInterface.InitMessage(_("Rewinding blocks..."));
+                if (!RewindBlockIndex(chainparams)) {
+                    strLoadError = _("Unable to rewind the database to a pre-fork state. You will need to redownload the blockchain");
+                    break;
                 }
+            }
 
+            try {
+                LOCK(cs_main);
                 if (!is_coinsview_empty) {
                     uiInterface.InitMessage(_("Verifying blocks..."));
                     if (fHavePruned && gArgs.GetArg("-checkblocks", DEFAULT_CHECKBLOCKS) > MIN_BLOCKS_TO_KEEP) {
@@ -1644,11 +1678,11 @@ bool AppInitMain(InitInterfaces& interfaces)
 
     // ********************************************************* Step 11: import blocks
 
-    if (!CheckDiskSpace(/* additional_bytes */ 0, /* blocks_dir */ false)) {
+    if (!CheckDiskSpace(GetDataDir())) {
         InitError(strprintf(_("Error: Disk space is low for %s"), GetDataDir()));
         return false;
     }
-    if (!CheckDiskSpace(/* additional_bytes */ 0, /* blocks_dir */ true)) {
+    if (!CheckDiskSpace(GetBlocksDir())) {
         InitError(strprintf(_("Error: Disk space is low for %s"), GetBlocksDir()));
         return false;
     }
