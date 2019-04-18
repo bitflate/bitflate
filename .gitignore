@@ -124,3 +124,11 @@ contrib/devtools/split-debug.sh
 
 # Output from running db4 installation
 db4/
+<<<<<<< HEAD
+=======
+
+# clang-check
+*.plist
+
+.vscode/
+>>>>>>> Disable more tests
