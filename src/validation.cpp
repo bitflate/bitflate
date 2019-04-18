@@ -1159,11 +1159,11 @@ CAmount GetBlockSubsidy(int nHeight, const Consensus::Params& consensusParams)
     // At that point, we'd have 10,500,000 (10.5 million) coins.
     // Those are our base coins.
     // After halving 1, we calculate inflate coin number.
-    if (halvings > 1) {
+    if (halvings > 0) {
         // calculate coin inflation for this halving
-        CAmount inflateCoins = round(10500000 * (pow(1.7, halvings - 2) - pow(1.7, halvings - 3)));
+        CAmount inflateCoins = 10500000 * (pow(1.07, halvings) - pow(1.07, halvings - 1));
         // subsidy is inflateCoins / 210000 * COIN
-        nSubsidy = round(((float)inflateCoins / (float)210000) * COIN);
+        nSubsidy = round(((double)inflateCoins / (double)210000) * 100) / 100 * COIN;
     } else {
         nSubsidy = 50 * COIN;
         // Subsidy is cut in half every 210,000 blocks which will occur approximately every 4 years.
