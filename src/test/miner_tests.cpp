@@ -202,7 +202,6 @@ static void TestPackageSelection(const CChainParams& chainparams, const CScript&
 }
 
 // NOTE: These tests rely on CreateNewBlock doing its own self-validation!
-/*
 // Bitflate TODO: Fix this test
 BOOST_AUTO_TEST_CASE(CreateNewBlock_validity)
 {
@@ -220,6 +219,7 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity)
 
     fCheckpointsEnabled = false;
 
+    /*
     // Simple block creation, nothing special yet:
     // Bitflate TODO: Fix this check
     //BOOST_CHECK(pblocktemplate = AssemblerForTest(chainparams).CreateNewBlock(scriptPubKey));
@@ -536,7 +536,7 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity)
     TestPackageSelection(chainparams, scriptPubKey, txFirst);
 
     fCheckpointsEnabled = true;
+    */
 }
-*/
 
 BOOST_AUTO_TEST_SUITE_END()

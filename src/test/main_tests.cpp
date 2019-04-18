@@ -30,6 +30,11 @@ static void TestBlockSubsidyHalvings(const Consensus::Params& consensusParams)
             case 3: BOOST_CHECK_EQUAL(nSubsidy, 4.01 * COIN); break;
             case 4: BOOST_CHECK_EQUAL(nSubsidy, 4.29 * COIN); break;
             case 5: BOOST_CHECK_EQUAL(nSubsidy, 4.59 * COIN); break;
+            case 6: BOOST_CHECK_EQUAL(nSubsidy, 4.91 * COIN); break;
+            case 7: BOOST_CHECK_EQUAL(nSubsidy, 5.25 * COIN); break;
+            case 8: BOOST_CHECK_EQUAL(nSubsidy, 5.62 * COIN); break;
+            case 9: BOOST_CHECK_EQUAL(nSubsidy, 6.01 * COIN); break;
+            case 10: BOOST_CHECK_EQUAL(nSubsidy, 6.43 * COIN); break;
         }
         nPreviousSubsidy = nSubsidy;
     }
