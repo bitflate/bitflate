@@ -18,25 +18,22 @@ static void TestBlockSubsidyHalvings(const Consensus::Params& consensusParams)
     int maxHalvings = 64;
     CAmount nInitialSubsidy = 50 * COIN;
 
-    CAmount nPreviousSubsidy = nInitialSubsidy * 2; // for height == 0
-    BOOST_CHECK_EQUAL(nPreviousSubsidy, nInitialSubsidy * 2);
     for (int nHalvings = 0; nHalvings < maxHalvings; nHalvings++) {
         int nHeight = nHalvings * consensusParams.nSubsidyHalvingInterval;
         CAmount nSubsidy = GetBlockSubsidy(nHeight, consensusParams);
         switch (nHalvings) {
             case 0: BOOST_CHECK_EQUAL(nSubsidy, nInitialSubsidy); break;
-            case 1: BOOST_CHECK_EQUAL(nSubsidy, 3.5 * COIN); break;
-            case 2: BOOST_CHECK_EQUAL(nSubsidy, 3.74 * COIN); break;
-            case 3: BOOST_CHECK_EQUAL(nSubsidy, 4.01 * COIN); break;
-            case 4: BOOST_CHECK_EQUAL(nSubsidy, 4.29 * COIN); break;
-            case 5: BOOST_CHECK_EQUAL(nSubsidy, 4.59 * COIN); break;
-            case 6: BOOST_CHECK_EQUAL(nSubsidy, 4.91 * COIN); break;
-            case 7: BOOST_CHECK_EQUAL(nSubsidy, 5.25 * COIN); break;
-            case 8: BOOST_CHECK_EQUAL(nSubsidy, 5.62 * COIN); break;
-            case 9: BOOST_CHECK_EQUAL(nSubsidy, 6.01 * COIN); break;
-            case 10: BOOST_CHECK_EQUAL(nSubsidy, 6.43 * COIN); break;
+            case 1: BOOST_CHECK_EQUAL(nSubsidy, 25 * COIN); break;
+            case 2: BOOST_CHECK_EQUAL(nSubsidy, round(12.5 * COIN)); break;
+            case 3: BOOST_CHECK_EQUAL(nSubsidy, round(6.25 * COIN)); break;
+            case 4: BOOST_CHECK_EQUAL(nSubsidy, round(6.45 * COIN)); break;
+            case 5: BOOST_CHECK_EQUAL(nSubsidy, round(6.90 * COIN)); break;
+            case 6: BOOST_CHECK_EQUAL(nSubsidy, round(7.39 * COIN)); break;
+            case 7: BOOST_CHECK_EQUAL(nSubsidy, round(7.91 * COIN)); break;
+            case 8: BOOST_CHECK_EQUAL(nSubsidy, round(8.46 * COIN)); break;
+            case 9: BOOST_CHECK_EQUAL(nSubsidy, round(9.05 * COIN)); break;
+            case 10: BOOST_CHECK_EQUAL(nSubsidy, round(9.68 * COIN)); break;
         }
-        nPreviousSubsidy = nSubsidy;
     }
 }
 
@@ -55,7 +52,7 @@ BOOST_AUTO_TEST_CASE(subsidy_limit_test)
         nSum += nSubsidy * 1000;
         BOOST_CHECK(MoneyRange(nSum));
     }
-    BOOST_CHECK_EQUAL(nSum, CAmount{89318249998810000});
+    BOOST_CHECK_EQUAL(nSum, CAmount{134461179999160000});
 }
 
 static bool ReturnFalse() { return false; }
