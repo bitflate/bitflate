@@ -1151,12 +1151,13 @@ CAmount GetBlockSubsidy(int nHeight, const Consensus::Params& consensusParams)
     int halvings = nHeight / consensusParams.nSubsidyHalvingInterval;
     CAmount nSubsidy = 0;
     // Inflation starts at halvings 2.
-    // At that point, we'd have 10,500,000 (10.5 million) coins.
+    // At that point, we'd have 19,359,375 (~ 19 million) coins.
     // Those are our base coins.
-    // After halving 1, we calculate inflate coin number.
-    if (halvings > 0) {
+    // See bitcoin supply schedule
+    // After halving 4, we calculate inflate coin number.
+    if (halvings > 3) {
         // calculate coin inflation for this halving
-        CAmount inflateCoins = 10500000 * (pow(1.07, halvings) - pow(1.07, halvings - 1));
+        CAmount inflateCoins = 19359375 * (pow(1.07, halvings - 3) - pow(1.07, halvings - 4));
         // subsidy is inflateCoins / 210000 * COIN
         nSubsidy = round(((double)inflateCoins / (double)210000) * 100) / 100 * COIN;
     } else {
