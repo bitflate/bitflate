@@ -14,7 +14,8 @@ CFeeRate::CFeeRate(const CAmount& nFeePaid, size_t nBytes_)
     assert(nBytes_ <= uint64_t(std::numeric_limits<int64_t>::max()));
     int64_t nSize = int64_t(nBytes_);
 
-    if (nSize > 0)
+    // Bitflate
+    if (nSize > 0 && nFeePaid < MAX_MONEY / 1000)
         nSatoshisPerK = nFeePaid * 1000 / nSize;
     else
         nSatoshisPerK = 0;
