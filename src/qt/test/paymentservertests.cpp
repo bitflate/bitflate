@@ -200,10 +200,10 @@ void PaymentServerTests::paymentServerTests()
     // Extract address and amount from the request
     QList<std::pair<CScript, CAmount> > sendingTos = r.paymentRequest.getPayTo();
     for (const std::pair<CScript, CAmount>& sendingTo : sendingTos) {
-        // Bitflate TODO: Fix this check
-        //CTxDestination dest;
-        //if (ExtractDestination(sendingTo.first, dest))
-            //QCOMPARE(PaymentServer::verifyAmount(sendingTo.second), false);
+        CTxDestination dest;
+        // Bitflate allows payment to be larger than 21 million
+        if (ExtractDestination(sendingTo.first, dest))
+            QCOMPARE(PaymentServer::verifyAmount(sendingTo.second), true);
     }
 
     delete server;
