@@ -21,10 +21,31 @@ Technical
 
 Bitflate is based on Bitcoin. It has the following differences:
 
-- It creates 10.5 million coins in the first halving.
 - Proof of Work timespan adjustment is 3.5 days.
 - Block time is 2.5 minutes. That means 1-year halving interval.
-- In subsequent halvings, coins inflate 7% per year. At this inflation rate, coin supply doubles - every 10 years.
+- For the first four halvings interval, block reward is like Bitcoin (50, 25, 12.5, 6.25).
+- In subsequent intervals, there's not more halving. Coins inflate 7% per year. At this inflation rate, coin supply doubles - every 10 years.
+- You can review block reward code here:
+
+https://github.com/bitflate/bitflate/blob/master/src/validation.cpp#L1158
+
+- And here's the test for block reward:
+
+https://github.com/bitflate/bitflate/blob/master/src/test/validation_tests.cpp#L25
+
+- Block reward schedule:
+
+  - 0: 50
+  - 1: 25
+  - 2: 12.5
+  - 3: 6.25
+  - 4: 6.45
+  - 5: 6.90
+  - 6: 7.39
+  - 7: 7.91
+  - 8: 8.46
+  - 9: 9.05
+  - 10: 9.68
 
 FAQ
 -------
