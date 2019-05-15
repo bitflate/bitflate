@@ -23,7 +23,7 @@ Bitflate is based on Bitcoin. It has the following differences:
 
 - Proof of Work timespan adjustment is 3.5 days.
 - Block time is 2.5 minutes. That means 1-year halving interval.
-- For the first four halvings interval, block reward is like Bitcoin (50, 25, 12.5, 6.25).
+- For the first four halvings interval, block reward is like Bitcoin (50, 25, 12.5, 6.25). We give incentives to early adopters.
 - In subsequent intervals, there's not more halving. Coins inflate 7% per year. At this inflation rate, coin supply doubles - every 10 years.
 - You can review block reward code here:
 
