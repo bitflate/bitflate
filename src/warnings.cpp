@@ -4,14 +4,13 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include <sync.h>
-#include <clientversion.h>
 #include <util/system.h>
 #include <warnings.h>
 
-CCriticalSection cs_warnings;
-std::string strMiscWarning GUARDED_BY(cs_warnings);
-bool fLargeWorkForkFound GUARDED_BY(cs_warnings) = false;
-bool fLargeWorkInvalidChainFound GUARDED_BY(cs_warnings) = false;
+static RecursiveMutex cs_warnings;
+static std::string strMiscWarning GUARDED_BY(cs_warnings);
+static bool fLargeWorkForkFound GUARDED_BY(cs_warnings) = false;
+static bool fLargeWorkInvalidChainFound GUARDED_BY(cs_warnings) = false;
 
 void SetMiscWarning(const std::string& strWarning)
 {

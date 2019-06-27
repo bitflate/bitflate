@@ -1,4 +1,4 @@
-// Copyright (c) 2018 The Bitcoin Core developers
+// Copyright (c) 2018-2019 The Bitcoin Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -37,11 +37,12 @@
 namespace interfaces {
 namespace {
 
-class LockImpl : public Chain::Lock
+class LockImpl : public Chain::Lock, public UniqueLock<CCriticalSection>
 {
     Optional<int> getHeight() override
     {
-        int height = ::chainActive.Height();
+        LockAssertion lock(::cs_main);
+        int height = ::ChainActive().Height();
         if (height >= 0) {
             return height;
         }
@@ -49,8 +50,9 @@ class LockImpl : public Chain::Lock
     }
     Optional<int> getBlockHeight(const uint256& hash) override
     {
+        LockAssertion lock(::cs_main);
         CBlockIndex* block = LookupBlockIndex(hash);
-        if (block && ::chainActive.Contains(block)) {
+        if (block && ::ChainActive().Contains(block)) {
             return block->nHeight;
         }
         return nullopt;
@@ -63,54 +65,46 @@ class LockImpl : public Chain::Lock
     }
     uint256 getBlockHash(int height) override
     {
-        CBlockIndex* block = ::chainActive[height];
+        LockAssertion lock(::cs_main);
+        CBlockIndex* block = ::ChainActive()[height];
         assert(block != nullptr);
         return block->GetBlockHash();
     }
     int64_t getBlockTime(int height) override
     {
-        CBlockIndex* block = ::chainActive[height];
+        LockAssertion lock(::cs_main);
+        CBlockIndex* block = ::ChainActive()[height];
         assert(block != nullptr);
         return block->GetBlockTime();
     }
     int64_t getBlockMedianTimePast(int height) override
     {
-        CBlockIndex* block = ::chainActive[height];
+        LockAssertion lock(::cs_main);
+        CBlockIndex* block = ::ChainActive()[height];
         assert(block != nullptr);
         return block->GetMedianTimePast();
     }
     bool haveBlockOnDisk(int height) override
     {
-        CBlockIndex* block = ::chainActive[height];
+        LockAssertion lock(::cs_main);
+        CBlockIndex* block = ::ChainActive()[height];
         return block && ((block->nStatus & BLOCK_HAVE_DATA) != 0) && block->nTx > 0;
     }
-    Optional<int> findFirstBlockWithTime(int64_t time, uint256* hash) override
+    Optional<int> findFirstBlockWithTimeAndHeight(int64_t time, int height, uint256* hash) override
     {
-        CBlockIndex* block = ::chainActive.FindEarliestAtLeast(time);
+        LockAssertion lock(::cs_main);
+        CBlockIndex* block = ::ChainActive().FindEarliestAtLeast(time, height);
         if (block) {
             if (hash) *hash = block->GetBlockHash();
             return block->nHeight;
         }
         return nullopt;
     }
-    Optional<int> findFirstBlockWithTimeAndHeight(int64_t time, int height) override
-    {
-        // TODO: Could update CChain::FindEarliestAtLeast() to take a height
-        // parameter and use it with std::lower_bound() to make this
-        // implementation more efficient and allow combining
-        // findFirstBlockWithTime and findFirstBlockWithTimeAndHeight into one
-        // method.
-        for (CBlockIndex* block = ::chainActive[height]; block; block = ::chainActive.Next(block)) {
-            if (block->GetBlockTime() >= time) {
-                return block->nHeight;
-            }
-        }
-        return nullopt;
-    }
     Optional<int> findPruned(int start_height, Optional<int> stop_height) override
     {
+        LockAssertion lock(::cs_main);
         if (::fPruneMode) {
-            CBlockIndex* block = stop_height ? ::chainActive[*stop_height] : ::chainActive.Tip();
+            CBlockIndex* block = stop_height ? ::ChainActive()[*stop_height] : ::ChainActive().Tip();
             while (block && block->nHeight >= start_height) {
                 if ((block->nStatus & BLOCK_HAVE_DATA) == 0) {
                     return block->nHeight;
@@ -122,8 +116,9 @@ class LockImpl : public Chain::Lock
     }
     Optional<int> findFork(const uint256& hash, Optional<int>* height) override
     {
+        LockAssertion lock(::cs_main);
         const CBlockIndex* block = LookupBlockIndex(hash);
-        const CBlockIndex* fork = block ? ::chainActive.FindFork(block) : nullptr;
+        const CBlockIndex* fork = block ? ::ChainActive().FindFork(block) : nullptr;
         if (height) {
             if (block) {
                 *height = block->nHeight;
@@ -136,36 +131,31 @@ class LockImpl : public Chain::Lock
         }
         return nullopt;
     }
-    bool isPotentialTip(const uint256& hash) override
+    CBlockLocator getTipLocator() override
     {
-        if (::chainActive.Tip()->GetBlockHash() == hash) return true;
-        CBlockIndex* block = LookupBlockIndex(hash);
-        return block && block->GetAncestor(::chainActive.Height()) == ::chainActive.Tip();
+        LockAssertion lock(::cs_main);
+        return ::ChainActive().GetLocator();
     }
-    CBlockLocator getTipLocator() override { return ::chainActive.GetLocator(); }
     Optional<int> findLocatorFork(const CBlockLocator& locator) override
     {
-        LockAnnotation lock(::cs_main);
-        if (CBlockIndex* fork = FindForkInGlobalIndex(::chainActive, locator)) {
+        LockAssertion lock(::cs_main);
+        if (CBlockIndex* fork = FindForkInGlobalIndex(::ChainActive(), locator)) {
             return fork->nHeight;
         }
         return nullopt;
     }
     bool checkFinalTx(const CTransaction& tx) override
     {
-        LockAnnotation lock(::cs_main);
+        LockAssertion lock(::cs_main);
         return CheckFinalTx(tx);
     }
     bool submitToMemoryPool(const CTransactionRef& tx, CAmount absurd_fee, CValidationState& state) override
     {
-        LockAnnotation lock(::cs_main);
+        LockAssertion lock(::cs_main);
         return AcceptToMemoryPool(::mempool, state, tx, nullptr /* missing inputs */, nullptr /* txn replaced */,
             false /* bypass limits */, absurd_fee);
     }
-};
 
-class LockingStateImpl : public LockImpl, public UniqueLock<CCriticalSection>
-{
     using UniqueLock::UniqueLock;
 };
 
@@ -256,13 +246,12 @@ class ChainImpl : public Chain
 public:
     std::unique_ptr<Chain::Lock> lock(bool try_lock) override
     {
-        auto result = MakeUnique<LockingStateImpl>(::cs_main, "cs_main", __FILE__, __LINE__, try_lock);
+        auto result = MakeUnique<LockImpl>(::cs_main, "cs_main", __FILE__, __LINE__, try_lock);
         if (try_lock && result && !*result) return {};
         // std::move necessary on some compilers due to conversion from
-        // LockingStateImpl to Lock pointer
+        // LockImpl to Lock pointer
         return std::move(result);
     }
-    std::unique_ptr<Chain::Lock> assumeLocked() override { return MakeUnique<LockImpl>(); }
     bool findBlock(const uint256& hash, CBlock* block, int64_t* time, int64_t* time_max) override
     {
         CBlockIndex* index;
@@ -339,11 +328,14 @@ public:
     CFeeRate relayMinFee() override { return ::minRelayTxFee; }
     CFeeRate relayIncrementalFee() override { return ::incrementalRelayFee; }
     CFeeRate relayDustFee() override { return ::dustRelayFee; }
-    CAmount maxTxFee() override { return ::maxTxFee; }
-    bool getPruneMode() override { return ::fPruneMode; }
+    bool havePruned() override
+    {
+        LOCK(cs_main);
+        return ::fHavePruned;
+    }
     bool p2pEnabled() override { return g_connman != nullptr; }
-    bool isReadyToBroadcast() override { return !::fImporting && !::fReindex && !IsInitialBlockDownload(); }
-    bool isInitialBlockDownload() override { return IsInitialBlockDownload(); }
+    bool isReadyToBroadcast() override { return !::fImporting && !::fReindex && !isInitialBlockDownload(); }
+    bool isInitialBlockDownload() override { return ::ChainstateActive().IsInitialBlockDownload(); }
     bool shutdownRequested() override { return ShutdownRequested(); }
     int64_t getAdjustedTime() override { return GetAdjustedTime(); }
     void initMessage(const std::string& message) override { ::uiInterface.InitMessage(message); }
@@ -358,7 +350,16 @@ public:
     {
         return MakeUnique<NotificationsHandlerImpl>(*this, notifications);
     }
-    void waitForNotifications() override { SyncWithValidationInterfaceQueue(); }
+    void waitForNotificationsIfNewBlocksConnected(const uint256& old_tip) override
+    {
+        if (!old_tip.IsNull()) {
+            LOCK(::cs_main);
+            if (old_tip == ::ChainActive().Tip()->GetBlockHash()) return;
+            CBlockIndex* block = LookupBlockIndex(old_tip);
+            if (block && block->GetAncestor(::ChainActive().Height()) == ::ChainActive().Tip()) return;
+        }
+        SyncWithValidationInterfaceQueue();
+    }
     std::unique_ptr<Handler> handleRpc(const CRPCCommand& command) override
     {
         return MakeUnique<RpcHandlerImpl>(command);

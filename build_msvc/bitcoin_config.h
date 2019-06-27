@@ -11,10 +11,10 @@
 #define CLIENT_VERSION_IS_RELEASE false
 
 /* Major version */
-#define CLIENT_VERSION_MAJOR 1
+#define CLIENT_VERSION_MAJOR 0
 
 /* Minor version */
-#define CLIENT_VERSION_MINOR 17
+#define CLIENT_VERSION_MINOR 18
 
 /* Build revision */
 #define CLIENT_VERSION_REVISION 99
@@ -29,7 +29,7 @@
 #define COPYRIGHT_HOLDERS_SUBSTITUTION "Bitcoin Core"
 
 /* Copyright year */
-#define COPYRIGHT_YEAR 2018
+#define COPYRIGHT_YEAR 2019
 
 /* Define to 1 to enable wallet functions */
 #define ENABLE_WALLET 1
@@ -346,7 +346,7 @@
 #define PACKAGE_NAME "Bitflate Core"
 
 /* Define to the full name and version of this package. */
-#define PACKAGE_STRING "Bitflate Core 0.17.99"
+#define PACKAGE_STRING "Bitflate Core 0.18.99"
 
 /* Define to the one symbol short name of this package. */
 #define PACKAGE_TARNAME "bitflate"
@@ -355,7 +355,7 @@
 #define PACKAGE_URL "https://bitflate.org/"
 
 /* Define to the version of this package. */
-#define PACKAGE_VERSION "0.17.99"
+#define PACKAGE_VERSION "0.18.99"
 
 /* Define to necessary symbol if this constant uses a non-standard name on
    your system. */

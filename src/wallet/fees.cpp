@@ -1,13 +1,11 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
-// Copyright (c) 2009-2018 The Bitcoin Core developers
+// Copyright (c) 2009-2019 The Bitcoin Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include <wallet/fees.h>
 
-#include <policy/policy.h>
 #include <util/system.h>
-#include <validation.h>
 #include <wallet/coincontrol.h>
 #include <wallet/wallet.h>
 
@@ -22,7 +20,7 @@ CAmount GetMinimumFee(const CWallet& wallet, unsigned int nTxBytes, const CCoinC
 {
     CAmount fee_needed = GetMinimumFeeRate(wallet, coin_control, feeCalc).GetFee(nTxBytes);
     // Always obey the maximum
-    const CAmount max_tx_fee = wallet.chain().maxTxFee();
+    const CAmount max_tx_fee = wallet.m_default_max_tx_fee;
     if (fee_needed > max_tx_fee) {
         fee_needed = max_tx_fee;
         if (feeCalc) feeCalc->reason = FeeReason::MAXTXFEE;

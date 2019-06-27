@@ -6,14 +6,11 @@
 
 #include <chainparams.h>
 #include <consensus/merkle.h>
-#include <consensus/validation.h>
 #include <key_io.h>
 #include <miner.h>
 #include <outputtype.h>
 #include <pow.h>
-#include <scheduler.h>
 #include <script/standard.h>
-#include <txdb.h>
 #include <validation.h>
 #include <validationinterface.h>
 #ifdef ENABLE_WALLET
@@ -21,6 +18,8 @@
 #endif
 
 #include <boost/thread.hpp>
+
+const std::string ADDRESS_BCRT1_UNSPENDABLE = "bcrt1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq3xueyj";
 
 #ifdef ENABLE_WALLET
 std::string getnewaddress(CWallet& w)
@@ -75,7 +74,6 @@ CTxIn MineBlock(const CScript& coinbase_scriptPubKey)
     return CTxIn{block->vtx[0]->GetHash(), 0};
 }
 
-
 std::shared_ptr<CBlock> PrepareBlock(const CScript& coinbase_scriptPubKey)
 {
     auto block = std::make_shared<CBlock>(
@@ -83,7 +81,8 @@ std::shared_ptr<CBlock> PrepareBlock(const CScript& coinbase_scriptPubKey)
             .CreateNewBlock(coinbase_scriptPubKey)
             ->block);
 
-    block->nTime = ::chainActive.Tip()->GetMedianTimePast() + 1;
+    LOCK(cs_main);
+    block->nTime = ::ChainActive().Tip()->GetMedianTimePast() + 1;
     block->hashMerkleRoot = BlockMerkleRoot(*block);
 
     return block;

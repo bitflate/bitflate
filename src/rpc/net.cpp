@@ -5,7 +5,6 @@
 #include <rpc/server.h>
 
 #include <banman.h>
-#include <chainparams.h>
 #include <clientversion.h>
 #include <core_io.h>
 #include <net.h>
@@ -17,7 +16,6 @@
 #include <rpc/util.h>
 #include <sync.h>
 #include <timedata.h>
-#include <ui_interface.h>
 #include <util/strencodings.h>
 #include <util/system.h>
 #include <validation.h>
@@ -496,7 +494,7 @@ static UniValue getnetworkinfo(const JSONRPCRequest& request)
     obj.pushKV("protocolversion",PROTOCOL_VERSION);
     if(g_connman)
         obj.pushKV("localservices", strprintf("%016x", g_connman->GetLocalServices()));
-    obj.pushKV("localrelay",     fRelayTxes);
+    obj.pushKV("localrelay", g_relay_txes);
     obj.pushKV("timeoffset",    GetTimeOffset());
     if (g_connman) {
         obj.pushKV("networkactive", g_connman->GetNetworkActive());

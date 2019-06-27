@@ -1,4 +1,4 @@
-// Copyright (c) 2018 The Bitcoin Core developers
+// Copyright (c) 2018-2019 The Bitcoin Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -42,12 +42,6 @@ class Wallet;
 //!   should be removed when clients are able to respond to updates
 //!   asynchronously
 //!   (https://github.com/bitcoin/bitcoin/pull/10973#issuecomment-380101269).
-//!
-//! * The isPotentialTip() and waitForNotifications() methods are too low-level
-//!   and should be replaced with a higher level
-//!   waitForNotificationsUpTo(block_hash) method that the wallet can call
-//!   instead
-//!   (https://github.com/bitcoin/bitcoin/pull/10973#discussion_r266995234).
 //!
 //! * The relayTransactions() and submitToMemoryPool() methods could be replaced
 //!   with a higher-level broadcastTransaction method
@@ -105,20 +99,11 @@ public:
         virtual bool haveBlockOnDisk(int height) = 0;
 
         //! Return height of the first block in the chain with timestamp equal
-        //! or greater than the given time, or nullopt if there is no block with
-        //! a high enough timestamp. Also return the block hash as an optional
-        //! output parameter (to avoid the cost of a second lookup in case this
-        //! information is needed.)
-        virtual Optional<int> findFirstBlockWithTime(int64_t time, uint256* hash) = 0;
-
-        //! Return height of the first block in the chain with timestamp equal
         //! or greater than the given time and height equal or greater than the
-        //! given height, or nullopt if there is no such block.
-        //!
-        //! Calling this with height 0 is equivalent to calling
-        //! findFirstBlockWithTime, but less efficient because it requires a
-        //! linear instead of a binary search.
-        virtual Optional<int> findFirstBlockWithTimeAndHeight(int64_t time, int height) = 0;
+        //! given height, or nullopt if there is no block with a high enough
+        //! timestamp and height. Also return the block hash as an optional output parameter
+        //! (to avoid the cost of a second lookup in case this information is needed.)
+        virtual Optional<int> findFirstBlockWithTimeAndHeight(int64_t time, int height, uint256* hash) = 0;
 
         //! Return height of last block in the specified range which is pruned, or
         //! nullopt if no block in the range is pruned. Range is inclusive.
@@ -131,11 +116,6 @@ public:
         //! parameter (to avoid the cost of a second hash lookup in case this
         //! information is desired).
         virtual Optional<int> findFork(const uint256& hash, Optional<int>* height) = 0;
-
-        //! Return true if block hash points to the current chain tip, or to a
-        //! possible descendant of the current chain tip that isn't currently
-        //! connected.
-        virtual bool isPotentialTip(const uint256& hash) = 0;
 
         //! Get locator for the current chain tip.
         virtual CBlockLocator getTipLocator() = 0;
@@ -157,11 +137,6 @@ public:
     //! Return Lock interface. Chain is locked when this is called, and
     //! unlocked when the returned interface is freed.
     virtual std::unique_ptr<Lock> lock(bool try_lock = false) = 0;
-
-    //! Return Lock interface assuming chain is already locked. This
-    //! method is temporary and is only used in a few places to avoid changing
-    //! behavior while code is transitioned to use the Chain::Lock interface.
-    virtual std::unique_ptr<Lock> assumeLocked() = 0;
 
     //! Return whether node has the block and optionally return block metadata
     //! or contents.
@@ -216,14 +191,8 @@ public:
     //! Relay dust fee setting (-dustrelayfee), reflecting lowest rate it's economical to spend.
     virtual CFeeRate relayDustFee() = 0;
 
-    //! Node max tx fee setting (-maxtxfee).
-    //! This could be replaced by a per-wallet max fee, as proposed at
-    //! https://github.com/bitcoin/bitcoin/issues/15355
-    //! But for the time being, wallets call this to access the node setting.
-    virtual CAmount maxTxFee() = 0;
-
-    //! Check if pruning is enabled.
-    virtual bool getPruneMode() = 0;
+    //! Check if any block has been pruned.
+    virtual bool havePruned() = 0;
 
     //! Check if p2p enabled.
     virtual bool p2pEnabled() = 0;
@@ -271,8 +240,10 @@ public:
     //! Register handler for notifications.
     virtual std::unique_ptr<Handler> handleNotifications(Notifications& notifications) = 0;
 
-    //! Wait for pending notifications to be handled.
-    virtual void waitForNotifications() = 0;
+    //! Wait for pending notifications to be processed unless block hash points to the current
+    //! chain tip, or to a possible descendant of the current chain tip that isn't currently
+    //! connected.
+    virtual void waitForNotificationsIfNewBlocksConnected(const uint256& old_tip) = 0;
 
     //! Register handler for RPC. Command is not copied, so reference
     //! needs to remain valid until Handler is disconnected.

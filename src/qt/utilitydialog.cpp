@@ -11,17 +11,12 @@
 #include <qt/forms/ui_helpmessagedialog.h>
 
 #include <qt/bitcoingui.h>
-#include <qt/clientmodel.h>
-#include <qt/guiconstants.h>
-#include <qt/intro.h>
 #ifdef ENABLE_BIP70
 #include <qt/paymentrequestplus.h>
 #endif
-#include <qt/guiutil.h>
 
 #include <clientversion.h>
 #include <init.h>
-#include <interfaces/node.h>
 #include <util/system.h>
 #include <util/strencodings.h>
 
@@ -129,7 +124,7 @@ HelpMessageDialog::~HelpMessageDialog()
 void HelpMessageDialog::printToConsole()
 {
     // On other operating systems, the expected action is to print the message to the console.
-    fprintf(stdout, "%s\n", qPrintable(text));
+    tfm::format(std::cout, "%s\n", qPrintable(text));
 }
 
 void HelpMessageDialog::showOrPrint()

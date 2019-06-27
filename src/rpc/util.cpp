@@ -4,9 +4,12 @@
 
 #include <key_io.h>
 #include <keystore.h>
+#include <outputtype.h>
 #include <rpc/util.h>
 #include <tinyformat.h>
 #include <util/strencodings.h>
+
+#include <tuple>
 
 InitInterfaces* g_rpc_interfaces = nullptr;
 
@@ -148,8 +151,8 @@ CPubKey AddrToPubKey(CKeyStore* const keystore, const std::string& addr_in)
     return vchPubKey;
 }
 
-// Creates a multisig redeemscript from a given list of public keys and number required.
-CScript CreateMultisigRedeemscript(const int required, const std::vector<CPubKey>& pubkeys)
+// Creates a multisig address from a given list of public keys, number of signatures required, and the address type
+CTxDestination AddAndGetMultisigDestination(const int required, const std::vector<CPubKey>& pubkeys, OutputType type, CKeyStore& keystore, CScript& script_out)
 {
     // Gather public keys
     if (required < 1) {
@@ -162,13 +165,24 @@ CScript CreateMultisigRedeemscript(const int required, const std::vector<CPubKey
         throw JSONRPCError(RPC_INVALID_PARAMETER, "Number of keys involved in the multisignature address creation > 16\nReduce the number");
     }
 
-    CScript result = GetScriptForMultisig(required, pubkeys);
+    script_out = GetScriptForMultisig(required, pubkeys);
 
-    if (result.size() > MAX_SCRIPT_ELEMENT_SIZE) {
-        throw JSONRPCError(RPC_INVALID_PARAMETER, (strprintf("redeemScript exceeds size limit: %d > %d", result.size(), MAX_SCRIPT_ELEMENT_SIZE)));
+    if (script_out.size() > MAX_SCRIPT_ELEMENT_SIZE) {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, (strprintf("redeemScript exceeds size limit: %d > %d", script_out.size(), MAX_SCRIPT_ELEMENT_SIZE)));
     }
 
-    return result;
+    // Check if any keys are uncompressed. If so, the type is legacy
+    for (const CPubKey& pk : pubkeys) {
+        if (!pk.IsCompressed()) {
+            type = OutputType::LEGACY;
+            break;
+        }
+    }
+
+    // Make the address
+    CTxDestination dest = AddAndGetDestinationForScript(keystore, script_out, type);
+
+    return dest;
 }
 
 class DescribeAddressVisitor : public boost::static_visitor<UniValue>
@@ -181,7 +195,7 @@ public:
         return UniValue(UniValue::VOBJ);
     }
 
-    UniValue operator()(const CKeyID& keyID) const
+    UniValue operator()(const PKHash& keyID) const
     {
         UniValue obj(UniValue::VOBJ);
         obj.pushKV("isscript", false);
@@ -189,7 +203,7 @@ public:
         return obj;
     }
 
-    UniValue operator()(const CScriptID& scriptID) const
+    UniValue operator()(const ScriptHash& scriptID) const
     {
         UniValue obj(UniValue::VOBJ);
         obj.pushKV("isscript", true);
@@ -654,7 +668,7 @@ std::string RPCArg::ToString(const bool oneline) const
     assert(false);
 }
 
-std::pair<int64_t, int64_t> ParseRange(const UniValue& value)
+static std::pair<int64_t, int64_t> ParseRange(const UniValue& value)
 {
     if (value.isNum()) {
         return {0, value.get_int64()};
@@ -666,4 +680,20 @@ std::pair<int64_t, int64_t> ParseRange(const UniValue& value)
         return {low, high};
     }
     throw JSONRPCError(RPC_INVALID_PARAMETER, "Range must be specified as end or as [begin,end]");
+}
+
+std::pair<int64_t, int64_t> ParseDescriptorRange(const UniValue& value)
+{
+    int64_t low, high;
+    std::tie(low, high) = ParseRange(value);
+    if (low < 0) {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Range should be greater or equal than 0");
+    }
+    if ((high >> 31) != 0) {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "End of range is too high");
+    }
+    if (high >= low + 1000000) {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Range is too large");
+    }
+    return {low, high};
 }

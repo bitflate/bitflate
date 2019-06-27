@@ -3,27 +3,20 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-#include <chain.h>
-#include <clientversion.h>
-#include <core_io.h>
 #include <crypto/ripemd160.h>
 #include <key_io.h>
-#include <validation.h>
 #include <httpserver.h>
-#include <net.h>
-#include <netbase.h>
 #include <outputtype.h>
 #include <rpc/blockchain.h>
 #include <rpc/server.h>
 #include <rpc/util.h>
 #include <script/descriptor.h>
-#include <timedata.h>
 #include <util/system.h>
 #include <util/strencodings.h>
 #include <util/validation.h>
-#include <warnings.h>
 
 #include <stdint.h>
+#include <tuple>
 #ifdef HAVE_MALLOC_INFO
 #include <malloc.h>
 #endif
@@ -129,9 +122,9 @@ static UniValue createmultisig(const JSONRPCRequest& request)
     }
 
     // Construct using pay-to-script-hash:
-    const CScript inner = CreateMultisigRedeemscript(required, pubkeys);
     CBasicKeyStore keystore;
-    const CTxDestination dest = AddAndGetDestinationForScript(keystore, inner, output_type);
+    CScript inner;
+    const CTxDestination dest = AddAndGetMultisigDestination(required, pubkeys, output_type, keystore, inner);
 
     UniValue result(UniValue::VOBJ);
     result.pushKV("address", EncodeDestination(dest));
@@ -203,7 +196,7 @@ UniValue deriveaddresses(const JSONRPCRequest& request)
             },
             RPCExamples{
                 "First three native segwit receive addresses\n" +
-                HelpExampleCli("deriveaddresses", "\"wpkh([d34db33f/84h/0h/0h]xpub6DJ2dNUysrn5Vt36jH2KLBT2i1auw1tTSSomg8PhqNiUtx8QX2SvC9nrHu81fT41fvDUnhMjEzQgXnQjKEu3oaqMSzhSrHMxyyoEAmUHQbY/0/*)#trd0mf0l\" \"[0,2]\"")
+                HelpExampleCli("deriveaddresses", "\"wpkh([d34db33f/84h/0h/0h]xpub6DJ2dNUysrn5Vt36jH2KLBT2i1auw1tTSSomg8PhqNiUtx8QX2SvC9nrHu81fT41fvDUnhMjEzQgXnQjKEu3oaqMSzhSrHMxyyoEAmUHQbY/0/*)#cjjspncu\" \"[0,2]\"")
             }}.ToString()
         );
     }
@@ -215,18 +208,7 @@ UniValue deriveaddresses(const JSONRPCRequest& request)
     int64_t range_end = 0;
 
     if (request.params.size() >= 2 && !request.params[1].isNull()) {
-        auto range = ParseRange(request.params[1]);
-        if (range.first < 0) {
-            throw JSONRPCError(RPC_INVALID_PARAMETER, "Range should be greater or equal than 0");
-        }
-        if ((range.second >> 31) != 0) {
-            throw JSONRPCError(RPC_INVALID_PARAMETER, "End of range is too high");
-        }
-        if (range.second >= range.first + 1000000) {
-            throw JSONRPCError(RPC_INVALID_PARAMETER, "Range is too large");
-        }
-        range_begin = range.first;
-        range_end = range.second;
+        std::tie(range_begin, range_end) = ParseDescriptorRange(request.params[1]);
     }
 
     FlatSigningProvider key_provider;
@@ -307,8 +289,8 @@ static UniValue verifymessage(const JSONRPCRequest& request)
         throw JSONRPCError(RPC_TYPE_ERROR, "Invalid address");
     }
 
-    const CKeyID *keyID = boost::get<CKeyID>(&destination);
-    if (!keyID) {
+    const PKHash *pkhash = boost::get<PKHash>(&destination);
+    if (!pkhash) {
         throw JSONRPCError(RPC_TYPE_ERROR, "Address does not refer to key");
     }
 
@@ -326,7 +308,7 @@ static UniValue verifymessage(const JSONRPCRequest& request)
     if (!pubkey.RecoverCompact(ss.GetHash(), vchSig))
         return false;
 
-    return (pubkey.GetID() == *keyID);
+    return (pubkey.GetID() == *pkhash);
 }
 
 static UniValue signmessagewithprivkey(const JSONRPCRequest& request)

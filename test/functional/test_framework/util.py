@@ -216,7 +216,7 @@ def wait_until(predicate, *, attempts=float('inf'), timeout=float('inf'), lock=N
         time.sleep(0.05)
 
     # Print the cause of the timeout
-    predicate_source = inspect.getsourcelines(predicate)
+    predicate_source = "''''\n" + inspect.getsource(predicate) + "'''"
     logger.error("wait_until() failed. Predicate: {}".format(predicate_source))
     if attempt >= attempts:
         raise AssertionError("Predicate {} not true after {} attempts".format(predicate_source, attempts))
@@ -228,7 +228,7 @@ def wait_until(predicate, *, attempts=float('inf'), timeout=float('inf'), lock=N
 ############################################
 
 # The maximum number of nodes a single test can spawn
-MAX_NODES = 8
+MAX_NODES = 12
 # Don't assign rpc or p2p ports lower than this
 PORT_MIN = 11000
 # The number of ports to "reserve" for p2p and rpc, each

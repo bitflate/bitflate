@@ -1,5 +1,19 @@
-(note: this is a temporary file, to be added-to by anybody, and moved to
-release-notes at release time)
+*After branching off for a major version release of Bitcoin Core, use this
+template to create the initial release notes draft.*
+
+*The release notes draft is a temporary file that can be added to by anyone. See
+[/doc/developer-notes.md#release-notes](/doc/developer-notes.md#release-notes)
+for the process.*
+
+*Create the draft, named* "*version* Release Notes Draft"
+*(e.g. "0.20.0 Release Notes Draft"), as a collaborative wiki in:*
+
+https://github.com/bitcoin-core/bitcoin-devwiki/wiki/
+
+*Before the final release, move the notes back to this git repository.*
+
+*version* Release Notes Draft
+===============================
 
 Bitcoin Core version *version* is now available from:
 
@@ -24,14 +38,9 @@ shut down (which might take a few minutes for older versions), then run the
 installer (on Windows) or just copy over `/Applications/Bitcoin-Qt` (on Mac)
 or `bitcoind`/`bitcoin-qt` (on Linux).
 
-The first time you run version 0.15.0, your chainstate database will be converted to a
-new format, which will take anywhere from a few minutes to half an hour,
-depending on the speed of your machine.
-
-Note that the block database format also changed in version 0.8.0 and there is no
-automatic upgrade code from before version 0.8 to version 0.15.0. Upgrading
-directly from 0.7.x and earlier without redownloading the blockchain is not supported.
-However, as usual, old wallet versions are still supported.
+Upgrading directly from a version of Bitcoin Core that has reached its EOL is
+possible, but might take some time if the datadir needs to be migrated.  Old
+wallet versions of Bitcoin Core are generally supported.
 
 Downgrading warning
 -------------------
@@ -66,13 +75,22 @@ platform.
 Notable changes
 ===============
 
+New RPCs
+--------
+
+- `getbalances` returns an object with all balances (`mine`,
+  `untrusted_pending` and `immature`). Please refer to the RPC help of
+  `getbalances` for details. The new RPC is intended to replace
+  `getunconfirmedbalance` and the balance fields in `getwalletinfo`, as well as
+  `getbalance`. The old calls may be removed in a future version.
+
 Updated RPCs
 ------------
 
 Note: some low-level RPC changes mainly useful for testing are described in the
 Low-level Changes section below.
 
-* The `sendmany` RPC had an argument `minconf` that was not well specified and
+- The `sendmany` RPC had an argument `minconf` that was not well specified and
   would lead to RPC errors even when the wallet's coin selection would succeed.
   The `sendtoaddress` RPC never had this check, so to normalize the behavior,
   `minconf` is now ignored in `sendmany`. If the coin selection does not
@@ -88,10 +106,31 @@ Low-level changes
 Configuration
 ------------
 
-* An error is issued where previously a warning was issued when a setting in
+- An error is issued where previously a warning was issued when a setting in
   the config file was specified in the default section, but not overridden for
   the selected network. This change takes only effect if the selected network
   is not mainnet.
+
+Network
+-------
+
+- When fetching a transaction announced by multiple peers, previous versions of
+  Bitcoin Core would sequentially attempt to download the transaction from each
+  announcing peer until the transaction is received, in the order that those
+  peers' announcements were received.  In this release, the download logic has
+  changed to randomize the fetch order across peers and to prefer sending
+  download requests to outbound peers over inbound peers. This fixes an issue
+  where inbound peers can prevent a node from getting a transaction.
+
+Wallet
+------
+
+- When in pruned mode, a rescan that was triggered by an `importwallet`,
+  `importpubkey`, `importaddress`, or `importprivkey` RPC will only fail when
+  blocks have been pruned. Previously it would fail when `-prune` has been set.
+  This change allows to set `-prune` to a high value (e.g. the disk size) and
+  the calls to any of the import RPCs would fail when the first block is
+  pruned.
 
 Credits
 =======
