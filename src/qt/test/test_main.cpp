@@ -26,6 +26,8 @@
 #include <QObject>
 #include <QTest>
 
+#include <openssl/ssl.h>
+
 #if defined(QT_STATICPLUGIN)
 #include <QtPlugin>
 #if defined(QT_QPA_PLATFORM_MINIMAL)
@@ -40,18 +42,12 @@ Q_IMPORT_PLUGIN(QCocoaIntegrationPlugin);
 #endif
 #endif
 
+extern void noui_connect();
+
 // This is all you need to run all the tests
 int main(int argc, char *argv[])
 {
-    // Initialize persistent globals with the testing setup state for sanity.
-    // E.g. -datadir in gArgs is set to a temp directory dummy value (instead
-    // of defaulting to the default datadir), or globalChainParams is set to
-    // regtest params.
-    //
-    // All tests must use their own testing setup (if needed).
-    {
-        BasicTestingSetup dummy{CBaseChainParams::REGTEST};
-    }
+    BasicTestingSetup test{CBaseChainParams::REGTEST};
 
     auto node = interfaces::MakeNode();
 
@@ -61,15 +57,17 @@ int main(int argc, char *argv[])
     // platform ("xcb", "windows", or "cocoa") so tests can't unintentionally
     // interfere with any background GUIs and don't require extra resources.
     #if defined(WIN32)
-        if (getenv("QT_QPA_PLATFORM") == nullptr) _putenv_s("QT_QPA_PLATFORM", "minimal");
+        _putenv_s("QT_QPA_PLATFORM", "minimal");
     #else
-        setenv("QT_QPA_PLATFORM", "minimal", /* overwrite */ 0);
+        setenv("QT_QPA_PLATFORM", "minimal", 0);
     #endif
 
     // Don't remove this, it's needed to access
     // QApplication:: and QCoreApplication:: in the tests
-    BitcoinApplication app(*node);
-    app.setApplicationName("Bitcoin-Qt-test");
+    BitcoinApplication app(*node, argc, argv);
+    app.setApplicationName("Bitflate-Qt-test");
+
+    SSL_library_init();
 
     AppTests app_tests(app);
     if (QTest::qExec(&app_tests) != 0) {
