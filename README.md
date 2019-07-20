@@ -27,7 +27,7 @@ Bitflate is based on Bitcoin. It has the following differences:
 - In subsequent intervals, there's not more halving. Coins inflate 7% per year. At this inflation rate, coin supply doubles - every 10 years.
 - You can review block reward code here:
 
-https://github.com/bitflate/bitflate/blob/master/src/validation.cpp#L1158
+https://github.com/bitflate/bitflate/blob/master/src/validation.cpp#L1007
 
 - And here's the test for block reward:
 
@@ -65,6 +65,14 @@ If this coin ever receives widespread adoption, high inflation can meet market d
 We pick the rate of 7% from Rule 72. https://en.wikipedia.org/wiki/Rule_of_72
 
 Coin supply doubles every 10 years.
+
+#### What is Bitflate relationship with Bitcoin?
+
+Bitflate started with Bitcoin Core codebase. It has changes in reward schedule and branding. Bitflate chain is separate chain and has no relationship with Bitcoin.
+
+#### Can I use Bitflate for business?
+
+Bitflate is at experimental stage as of July, 2019. We strongly advise you NOT to use it for business. The network is not secure.
 
 License
 -------
