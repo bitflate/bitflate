@@ -68,7 +68,7 @@ Coin supply doubles every 10 years.
 
 #### What is Bitflate relationship with Bitcoin?
 
-Bitflate started with Bitcoin Core codebase. It has changes in reward schedule and branding. Bitflate chain is separate chain and has no relationship with Bitcoin.
+Bitflate started with Bitcoin Core codebase. It has changes in reward schedule and branding. Bitflate chain is a separate chain and has no relationship with Bitcoin.
 
 #### Can I use Bitflate for business?
 
