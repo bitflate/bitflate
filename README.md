@@ -83,6 +83,6 @@ information or see https://opensource.org/licenses/MIT.
 Contact
 -------
 
-Email: dnprock@gmail.com
+Email: contact@bitflate.org
 
-Twitter: https://twitter.com/DoPhuoc
+Twitter: https://twitter.com/bitflate
