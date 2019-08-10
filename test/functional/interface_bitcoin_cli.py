@@ -16,7 +16,7 @@ class TestBitcoinCli(BitcoinTestFramework):
         """Main test logic"""
 
         cli_response = self.nodes[0].cli("-version").send_cli()
-        assert "Bitcoin Core RPC client version" in cli_response
+        assert "{} RPC client version".format(self.config['environment']['PACKAGE_NAME']) in cli_response
 
         self.log.info("Compare responses from getwalletinfo RPC and `bitcoin-cli getwalletinfo`")
         if self.is_wallet_compiled():
@@ -29,7 +29,7 @@ class TestBitcoinCli(BitcoinTestFramework):
         rpc_response = self.nodes[0].getblockchaininfo()
         assert_equal(cli_response, rpc_response)
 
-        user, password = get_auth_cookie(self.nodes[0].datadir)
+        user, password = get_auth_cookie(self.nodes[0].datadir, self.chain)
 
         self.log.info("Test -stdinrpcpass option")
         assert_equal(0, self.nodes[0].cli('-rpcuser=%s' % user, '-stdinrpcpass', input=password).getblockcount())

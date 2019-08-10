@@ -6,7 +6,7 @@
 #include <consensus/merkle.h>
 #include <chainparams.h>
 #include <pow.h>
-#include <random.h>
+#include <streams.h>
 
 #include <test/setup_common.h>
 
@@ -85,7 +85,7 @@ BOOST_AUTO_TEST_CASE(SimpleRoundTripTest)
         BOOST_CHECK_EQUAL(pool.mapTx.find(block.vtx[2]->GetHash())->GetSharedTx().use_count(), SHARED_TX_OFFSET + 1);
 
         size_t poolSize = pool.size();
-        pool.removeRecursive(*block.vtx[2]);
+        pool.removeRecursive(*block.vtx[2], MemPoolRemovalReason::REPLACED);
         BOOST_CHECK_EQUAL(pool.size(), poolSize - 1);
 
         CBlock block2;
@@ -386,6 +386,7 @@ BOOST_AUTO_TEST_CASE(TransactionsRequestDeserializationOverflowTest) {
         BOOST_CHECK(0);
     } catch(std::ios_base::failure &) {
         // deserialize should fail
+        BOOST_CHECK(true); // Needed to suppress "Test case [...] did not check any assertions"
     }
 }
 

@@ -3,8 +3,6 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include <validation.h>
-#include <txmempool.h>
-#include <amount.h>
 #include <consensus/validation.h>
 #include <primitives/transaction.h>
 #include <script/script.h>
@@ -52,10 +50,7 @@ BOOST_FIXTURE_TEST_CASE(tx_mempool_reject_coinbase, TestChain100Setup)
     // Check that the validation state reflects the unsuccessful attempt.
     BOOST_CHECK(state.IsInvalid());
     BOOST_CHECK_EQUAL(state.GetRejectReason(), "coinbase");
-
-    int nDoS;
-    BOOST_CHECK_EQUAL(state.IsInvalid(nDoS), true);
-    BOOST_CHECK_EQUAL(nDoS, 100);
+    BOOST_CHECK(state.GetReason() == ValidationInvalidReason::CONSENSUS);
 }
 
 BOOST_AUTO_TEST_SUITE_END()

@@ -1,4 +1,4 @@
-// Copyright (c) 2017-2018 The Bitcoin Core developers
+// Copyright (c) 2017-2019 The Bitcoin Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -10,14 +10,10 @@
 #include <wallet/wallet.h>
 #include <policy/fees.h>
 #include <policy/policy.h>
-#include <policy/rbf.h>
-#include <validation.h> //for mempool access
-#include <txmempool.h>
 #include <util/moneystr.h>
 #include <util/rbf.h>
 #include <util/system.h>
 #include <util/validation.h>
-#include <net.h>
 
 //! Check whether transaction has descendant in wallet or mempool, or has been
 //! mined, or conflicts with a mined transaction. Return a feebumper::Result.
@@ -146,9 +142,9 @@ Result CreateTotalBumpTransaction(const CWallet* wallet, const uint256& txid, co
     }
 
     // Check that in all cases the new fee doesn't violate maxTxFee
-     const CAmount max_tx_fee = wallet->chain().maxTxFee();
+     const CAmount max_tx_fee = wallet->m_default_max_tx_fee;
      if (new_fee > max_tx_fee) {
-         errors.push_back(strprintf("Specified or calculated fee %s is too high (cannot be higher than maxTxFee %s)",
+         errors.push_back(strprintf("Specified or calculated fee %s is too high (cannot be higher than -maxtxfee %s)",
                                FormatMoney(new_fee), FormatMoney(max_tx_fee)));
          return Result::WALLET_ERROR;
      }
@@ -276,17 +272,13 @@ Result CreateRateBumpTransaction(CWallet* wallet, const uint256& txid, const CCo
     new_coin_control.m_min_depth = 1;
 
     CTransactionRef tx_new = MakeTransactionRef();
-    CReserveKey reservekey(wallet);
     CAmount fee_ret;
     int change_pos_in_out = -1; // No requested location for change
     std::string fail_reason;
-    if (!wallet->CreateTransaction(*locked_chain, recipients, tx_new, reservekey, fee_ret, change_pos_in_out, fail_reason, new_coin_control, false)) {
+    if (!wallet->CreateTransaction(*locked_chain, recipients, tx_new, fee_ret, change_pos_in_out, fail_reason, new_coin_control, false)) {
         errors.push_back("Unable to create transaction: " + fail_reason);
         return Result::WALLET_ERROR;
     }
-
-    // If change key hasn't been ReturnKey'ed by this point, we take it out of keypool
-    reservekey.KeepKey();
 
     // Write back new fee if successful
     new_fee = fee_ret;
@@ -334,9 +326,8 @@ Result CommitTransaction(CWallet* wallet, const uint256& txid, CMutableTransacti
     mapValue_t mapValue = oldWtx.mapValue;
     mapValue["replaces_txid"] = oldWtx.GetHash().ToString();
 
-    CReserveKey reservekey(wallet);
     CValidationState state;
-    if (!wallet->CommitTransaction(tx, std::move(mapValue), oldWtx.vOrderForm, reservekey, state)) {
+    if (!wallet->CommitTransaction(tx, std::move(mapValue), oldWtx.vOrderForm, state)) {
         // NOTE: CommitTransaction never returns false, so this should never happen.
         errors.push_back(strprintf("The transaction was rejected: %s", FormatStateMessage(state)));
         return Result::WALLET_ERROR;
