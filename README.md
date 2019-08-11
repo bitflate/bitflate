@@ -7,7 +7,7 @@ What is Bitflate?
 Bitflate is a Bitcoin-based crypto currency. The project is in experimental stage.
 The main differentiation of Bitflate is inflation.
 
-The goal is to create a stable crypto currency, stable coin through inflation.
+The goal is to create a digital native stable crypto currency, a stable coin through inflation.
 
 By adding inflation, we can:
 
@@ -24,7 +24,7 @@ Bitflate is based on Bitcoin. It has the following differences:
 - Proof of Work timespan adjustment is 3.5 days.
 - Block time is 2.5 minutes. That means 1-year halving interval.
 - For the first four halvings interval, block reward is like Bitcoin (50, 25, 12.5, 6.25). We give incentives to early adopters.
-- In subsequent intervals, there's not more halving. Coins inflate 7% per year. At this inflation rate, coin supply doubles - every 10 years.
+- In subsequent intervals, there's not more halving. Coins inflate 7% per year. At this inflation rate, coin supply doubles every 10 years.
 - You can review block reward code here:
 
 https://github.com/bitflate/bitflate/blob/master/src/validation.cpp#L1007
