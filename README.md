@@ -38,14 +38,14 @@ https://github.com/bitflate/bitflate/blob/master/src/test/validation_tests.cpp#L
   - 0: 50
   - 1: 25
   - 2: 12.5
-  - 3: 6.25
-  - 4: 6.45
-  - 5: 6.90
-  - 6: 7.39
-  - 7: 7.91
-  - 8: 8.46
-  - 9: 9.05
-  - 10: 9.68
+  - 3: 6.25 (end of halving)
+  - 4: 6.65 (start of inflation 7%)
+  - 5: 7.02
+  - 6: 7.51
+  - 7: 8.04
+  - 8: 8.60
+  - 9: 9.20
+  - 10: 9.85
 
 FAQ
 -------
