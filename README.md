@@ -9,6 +9,12 @@ The main differentiation of Bitflate is inflation.
 
 The goal is to create a digital native stable crypto currency, a stable coin through inflation.
 
+Bitflate Core is a fork of Bitcoin Core.
+
+For more information, as well as an immediately usable, binary version of
+the Bitcoin Core software, see https://bitcoincore.org/en/download/, or read the
+[original whitepaper](https://bitcoincore.org/bitcoin.pdf).
+
 By adding inflation, we can:
 
 - Prevent price from fluctuating wildly.
