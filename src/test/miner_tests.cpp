@@ -16,12 +16,15 @@
 #include <util/system.h>
 #include <util/time.h>
 #include <validation.h>
+#include <pow.h>
 
 #include <test/util/setup_common.h>
 
 #include <memory>
 
 #include <boost/test/unit_test.hpp>
+
+#include <uint256.h>
 
 namespace miner_tests {
 struct MinerTestingSetup : public TestingSetup {
@@ -61,34 +64,9 @@ struct {
     unsigned char extranonce;
     unsigned int nonce;
 } blockinfo[] = {
-    {4, 0xa4a3e223}, {2, 0x15c32f9e}, {1, 0x0375b547}, {1, 0x7004a8a5},
-    {2, 0xce440296}, {2, 0x52cfe198}, {1, 0x77a72cd0}, {2, 0xbb5d6f84},
-    {2, 0x83f30c2c}, {1, 0x48a73d5b}, {1, 0xef7dcd01}, {2, 0x6809c6c4},
-    {2, 0x0883ab3c}, {1, 0x087bbbe2}, {2, 0x2104a814}, {2, 0xdffb6daa},
-    {1, 0xee8a0a08}, {2, 0xba4237c1}, {1, 0xa70349dc}, {1, 0x344722bb},
-    {3, 0xd6294733}, {2, 0xec9f5c94}, {2, 0xca2fbc28}, {1, 0x6ba4f406},
-    {2, 0x015d4532}, {1, 0x6e119b7c}, {2, 0x43e8f314}, {2, 0x27962f38},
-    {2, 0xb571b51b}, {2, 0xb36bee23}, {2, 0xd17924a8}, {2, 0x6bc212d9},
-    {1, 0x630d4948}, {2, 0x9a4c4ebb}, {2, 0x554be537}, {1, 0xd63ddfc7},
-    {2, 0xa10acc11}, {1, 0x759a8363}, {2, 0xfb73090d}, {1, 0xe82c6a34},
-    {1, 0xe33e92d7}, {3, 0x658ef5cb}, {2, 0xba32ff22}, {5, 0x0227a10c},
-    {1, 0xa9a70155}, {5, 0xd096d809}, {1, 0x37176174}, {1, 0x830b8d0f},
-    {1, 0xc6e3910e}, {2, 0x823f3ca8}, {1, 0x99850849}, {1, 0x7521fb81},
-    {1, 0xaacaabab}, {1, 0xd645a2eb}, {5, 0x7aea1781}, {5, 0x9d6e4b78},
-    {1, 0x4ce90fd8}, {1, 0xabdc832d}, {6, 0x4a34f32a}, {2, 0xf2524c1c},
-    {2, 0x1bbeb08a}, {1, 0xad47f480}, {1, 0x9f026aeb}, {1, 0x15a95049},
-    {2, 0xd1cb95b2}, {2, 0xf84bbda5}, {1, 0x0fa62cd1}, {1, 0xe05f9169},
-    {1, 0x78d194a9}, {5, 0x3e38147b}, {5, 0x737ba0d4}, {1, 0x63378e10},
-    {1, 0x6d5f91cf}, {2, 0x88612eb8}, {2, 0xe9639484}, {1, 0xb7fabc9d},
-    {2, 0x19b01592}, {1, 0x5a90dd31}, {2, 0x5bd7e028}, {2, 0x94d00323},
-    {1, 0xa9b9c01a}, {1, 0x3a40de61}, {1, 0x56e7eec7}, {5, 0x859f7ef6},
-    {1, 0xfd8e5630}, {1, 0x2b0c9f7f}, {1, 0xba700e26}, {1, 0x7170a408},
-    {1, 0x70de86a8}, {1, 0x74d64cd5}, {1, 0x49e738a1}, {2, 0x6910b602},
-    {0, 0x643c565f}, {1, 0x54264b3f}, {2, 0x97ea6396}, {2, 0x55174459},
-    {2, 0x03e8779a}, {1, 0x98f34d8f}, {1, 0xc07b2b07}, {1, 0xdfe29668},
-    {1, 0x3141c7c1}, {1, 0xb3b595f4}, {1, 0x735abf08}, {5, 0x623bfbce},
-    {2, 0xd351e722}, {1, 0xf4ca48c9}, {1, 0x5b19c670}, {1, 0xa164bf0e},
-    {2, 0xbbbeb305}, {2, 0xfe1c810a},
+    {1, 898387529}, {1, 3580156557}, {2, 12195579},
+    {1, 2819560176}, // {1, 2819560176}
+    {1, 0}
 };
 
 static CBlockIndex CreateBlockIndex(int nHeight) EXCLUSIVE_LOCKS_REQUIRED(cs_main)
@@ -204,6 +182,25 @@ void MinerTestingSetup::TestPackageSelection(const CChainParams& chainparams, co
     BOOST_CHECK(pblocktemplate->block.vtx[8]->GetHash() == hashLowFeeTx2);
 }
 
+void scanNonce(CBlock *pblock, Consensus::Params params, unsigned int start, unsigned int end, bool *foundNonce) {
+    for (unsigned int k = start; k <= end; k++) {
+        pblock->nNonce = k;
+        bool valid = CheckProofOfWork(pblock->GetHash(), pblock->nBits, params);
+        if (valid) {
+            printf("nonce %u\n", k);
+            *foundNonce = true;
+            break;
+        } else {
+            if (k % 400000 == 0) {
+                printf("k %u\n", k);
+            }
+        }
+        if (*foundNonce) {
+            break;
+        }
+    }
+}
+
 // NOTE: These tests rely on CreateNewBlock doing its own self-validation!
 // Bitflate TODO: Fix this test
 BOOST_AUTO_TEST_CASE(CreateNewBlock_validity)
@@ -252,18 +249,29 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity)
             pblock->nNonce = blockinfo[i].nonce;
         }
         std::shared_ptr<const CBlock> shared_pblock = std::make_shared<const CBlock>(*pblock);
+
         // Bitflate TODO: Need to update block for this check
         //BOOST_CHECK(ProcessNewBlock(chainparams, shared_pblock, true, nullptr));
+        Consensus::Params params = chainparams.GetConsensus();
+        if (i > 3) {
+            bool foundNonce = false;
+            boost::thread t1{boost::bind(scanNonce, pblock, params, 0, 2147483647, &foundNonce)};
+            boost::thread t2{boost::bind(scanNonce, pblock, params, 2147483647, 4294967295, &foundNonce)};
+            t1.join();
+            t2.join();
+        } else {
+            BOOST_CHECK(ProcessNewBlock(chainparams, shared_pblock, true, nullptr));
+        }
+        std::cout << "block hash " << pblock->GetHash() << std::endl;
         pblock->hashPrevBlock = pblock->GetHash();
     }
 
     LOCK(cs_main);
     LOCK(m_node.mempool->cs);
 
-    /*
     // Just to make sure we can still make simple blocks
     // Bitflate TODO: Fix this check
-    //BOOST_CHECK(pblocktemplate = AssemblerForTest(chainparams).CreateNewBlock(scriptPubKey));
+    BOOST_CHECK(pblocktemplate = AssemblerForTest(chainparams).CreateNewBlock(scriptPubKey));
 
     const CAmount BLOCKSUBSIDY = 50*COIN;
     const CAmount LOWFEE = CENT;
@@ -289,7 +297,7 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity)
     }
 
     // Bitflate TODO: Fix this check
-    //BOOST_CHECK_EXCEPTION(AssemblerForTest(chainparams).CreateNewBlock(scriptPubKey), std::runtime_error, HasReason("bad-blk-sigops"));
+    BOOST_CHECK_EXCEPTION(AssemblerForTest(chainparams).CreateNewBlock(scriptPubKey), std::runtime_error, HasReason("bad-blk-sigops"));
     m_node.mempool->clear();
 
     tx.vin[0].prevout.hash = txFirst[0]->GetHash();
@@ -305,9 +313,10 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity)
     }
 
     // Bitflate TODO: Fix this check
-    //BOOST_CHECK(pblocktemplate = AssemblerForTest(chainparams).CreateNewBlock(scriptPubKey));
+    BOOST_CHECK(pblocktemplate = AssemblerForTest(chainparams).CreateNewBlock(scriptPubKey));
     m_node.mempool->clear();
 
+    /*
     // block size > limit
     tx.vin[0].scriptSig = CScript();
     // 18 * (520char + DROP) + OP_1 = 9433 bytes
@@ -334,7 +343,7 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity)
 
     m_node.mempool->addUnchecked(entry.Fee(LOWFEE).Time(GetTime()).FromTx(tx));
     // Bitflate TODO: Fix this check
-    //BOOST_CHECK_EXCEPTION(AssemblerForTest(chainparams).CreateNewBlock(scriptPubKey), std::runtime_error, HasReason("bad-txns-inputs-missingorspent"));
+    BOOST_CHECK_EXCEPTION(AssemblerForTest(chainparams).CreateNewBlock(scriptPubKey), std::runtime_error, HasReason("bad-txns-inputs-missingorspent"));
     m_node.mempool->clear();
 
     // child with higher feerate than parent
@@ -366,7 +375,7 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity)
     m_node.mempool->addUnchecked(entry.Fee(LOWFEE).Time(GetTime()).SpendsCoinbase(false).FromTx(tx));
     // Should throw bad-cb-multiple
     // Bitflate TODO: Fix this check
-    //BOOST_CHECK_EXCEPTION(AssemblerForTest(chainparams).CreateNewBlock(scriptPubKey), std::runtime_error, HasReason("bad-cb-multiple"));
+    BOOST_CHECK_EXCEPTION(AssemblerForTest(chainparams).CreateNewBlock(scriptPubKey), std::runtime_error, HasReason("bad-cb-multiple"));
     m_node.mempool->clear();
 
     // double spend txn pair in *m_node.mempool, template creation fails
@@ -380,7 +389,7 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity)
     hash = tx.GetHash();
     m_node.mempool->addUnchecked(entry.Fee(HIGHFEE).Time(GetTime()).SpendsCoinbase(true).FromTx(tx));
     // Bitflate TODO: Fix this check
-    //BOOST_CHECK_EXCEPTION(AssemblerForTest(chainparams).CreateNewBlock(scriptPubKey), std::runtime_error, HasReason("bad-txns-inputs-missingorspent"));
+    BOOST_CHECK_EXCEPTION(AssemblerForTest(chainparams).CreateNewBlock(scriptPubKey), std::runtime_error, HasReason("bad-txns-inputs-missingorspent"));
     m_node.mempool->clear();
 
     // subsidy changing
@@ -397,7 +406,7 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity)
         ::ChainActive().SetTip(next);
     }
     // Bitflate TODO: Fix this check
-    //BOOST_CHECK(pblocktemplate = AssemblerForTest(chainparams).CreateNewBlock(scriptPubKey));
+    BOOST_CHECK(pblocktemplate = AssemblerForTest(chainparams).CreateNewBlock(scriptPubKey));
     // Extend to a 210000-long block chain.
     while (::ChainActive().Tip()->nHeight < 210000) {
         CBlockIndex* prev = ::ChainActive().Tip();
@@ -410,7 +419,7 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity)
         ::ChainActive().SetTip(next);
     }
     // Bitflate TODO: Fix this check
-    //BOOST_CHECK(pblocktemplate = AssemblerForTest(chainparams).CreateNewBlock(scriptPubKey));
+    BOOST_CHECK(pblocktemplate = AssemblerForTest(chainparams).CreateNewBlock(scriptPubKey));
 
     // invalid p2sh txn in *m_node.mempool, template creation fails
     tx.vin[0].prevout.hash = txFirst[0]->GetHash();
@@ -462,9 +471,9 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity)
     hash = tx.GetHash();
     m_node.mempool->addUnchecked(entry.Fee(HIGHFEE).Time(GetTime()).SpendsCoinbase(true).FromTx(tx));
     // Bitflate TODO: Fix this check
-    //BOOST_CHECK(CheckFinalTx(CTransaction(tx), flags)); // Locktime passes
-    //BOOST_CHECK(!TestSequenceLocks(CTransaction(tx), flags)); // Sequence locks fail
-    //BOOST_CHECK(SequenceLocks(CTransaction(tx), flags, &prevheights, CreateBlockIndex(::ChainActive().Tip()->nHeight + 2))); // Sequence locks pass on 2nd block
+    BOOST_CHECK(CheckFinalTx(CTransaction(tx), flags)); // Locktime passes
+    BOOST_CHECK(!TestSequenceLocks(CTransaction(tx), flags)); // Sequence locks fail
+    BOOST_CHECK(SequenceLocks(CTransaction(tx), flags, &prevheights, CreateBlockIndex(::ChainActive().Tip()->nHeight + 2))); // Sequence locks pass on 2nd block
 
     // relative time locked
     tx.vin[0].prevout.hash = txFirst[1]->GetHash();
@@ -473,8 +482,8 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity)
     hash = tx.GetHash();
     m_node.mempool->addUnchecked(entry.Time(GetTime()).FromTx(tx));
     // Bitflate TODO: Fix this check
-    //BOOST_CHECK(CheckFinalTx(CTransaction(tx), flags)); // Locktime passes
-    //BOOST_CHECK(!TestSequenceLocks(CTransaction(tx), flags)); // Sequence locks fail
+    BOOST_CHECK(CheckFinalTx(CTransaction(tx), flags)); // Locktime passes
+    BOOST_CHECK(!TestSequenceLocks(CTransaction(tx), flags)); // Sequence locks fail
 
     for (int i = 0; i < CBlockIndex::nMedianTimeSpan; i++)
         ::ChainActive().Tip()->GetAncestor(::ChainActive().Tip()->nHeight - i)->nTime += 512; //Trick the MedianTimePast
