@@ -64,9 +64,60 @@ struct {
     unsigned char extranonce;
     unsigned int nonce;
 } blockinfo[] = {
-    {1, 898387529}, {1, 3580156557}, {2, 12195579},
-    {1, 2819560176}, // {1, 2819560176}
-    {1, 0}
+    {1, 898387529},
+    {1, 3580156557},
+    {2, 12195579},
+    {1, 2819560176},
+    {4, 2590172044},
+    {5, 2413517449},
+    {0, 810765132},
+    {0, 1526178649},
+    {1, 2012058135},
+    {1, 759890880},
+    {2, 2031656960},
+    {1, 573287424},
+    {1, 1552763055},
+    {1, 1954429385},
+    {2, 1824857790},
+    {1, 3547208981},
+    {2, 968033752},
+    {1, 266631028},
+    {1, 1545901741},
+    {1, 1619102474},
+    {2, 871315862},
+    {2, 856871028},
+    {1, 1056871480},
+    {2, 3679910575},
+    {1, 2530040400},
+    {1, 1431864337},
+    {1, 2245444541},
+    {2, 3272040210},
+    {1, 855644720},
+    {1, 4100378240},
+    {1, 92171030},
+    {3, 269274587},
+    {1, 199819289},
+    {1, 2952941539},
+    {1, 387130153},
+    {2, 2555841659},
+    {1, 1115941069},
+    {3, 1237091526},
+    {2, 3819893022},
+    {5, 3852429508},
+    {2, 1344800709},
+    {1, 1884610537},
+    {1, 1093792476},
+    {3, 1201238560},
+    {1, 684775790},
+    {1, 2980433269},
+    {2, 3307346735},
+    {3, 1660205748},
+    {4, 3198639034},
+    {2, 246043454},
+    {1, 1173360485},
+    {1, 605889370},
+    {2, 2023109210},
+    {1, 2559411494},
 };
 
 static CBlockIndex CreateBlockIndex(int nHeight) EXCLUSIVE_LOCKS_REQUIRED(cs_main)
@@ -182,21 +233,24 @@ void MinerTestingSetup::TestPackageSelection(const CChainParams& chainparams, co
     BOOST_CHECK(pblocktemplate->block.vtx[8]->GetHash() == hashLowFeeTx2);
 }
 
-void scanNonce(CBlock *pblock, Consensus::Params params, unsigned int start, unsigned int end, bool *foundNonce) {
+void scanNonce(CBlock *pblock, Consensus::Params params, unsigned int start, unsigned int end, bool *foundNonce, unsigned int *nonceValue) {
     for (unsigned int k = start; k <= end; k++) {
         pblock->nNonce = k;
         bool valid = CheckProofOfWork(pblock->GetHash(), pblock->nBits, params);
+        if (*foundNonce) {
+            //pblock->nNonce = 0;
+            printf("Nonce is found, exit. Current scan nonce: %u.\n", k);
+            break;
+        }
         if (valid) {
-            printf("nonce %u\n", k);
+            printf("scanNonce found %u\n", k);
+            *nonceValue = k;
             *foundNonce = true;
             break;
         } else {
-            if (k % 400000 == 0) {
-                printf("k %u\n", k);
-            }
-        }
-        if (*foundNonce) {
-            break;
+            //if (k % 4000000 == 0) {
+            //    printf("k %u\n", k);
+            //}
         }
     }
 }
@@ -250,20 +304,126 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity)
         }
         std::shared_ptr<const CBlock> shared_pblock = std::make_shared<const CBlock>(*pblock);
 
-        // Bitflate TODO: Need to update block for this check
-        //BOOST_CHECK(ProcessNewBlock(chainparams, shared_pblock, true, nullptr));
-        Consensus::Params params = chainparams.GetConsensus();
-        if (i > 3) {
+        BOOST_CHECK(ProcessNewBlock(chainparams, shared_pblock, true, nullptr));
+        std::cout << "block " << i << " hash " << pblock->GetHash() << std::endl;
+        std::cout << "nonce " << blockinfo[i].nonce << std::endl;
+        pblock->hashPrevBlock = pblock->GetHash();
+    }
+
+    unsigned int blockinfo_length = sizeof(blockinfo)/sizeof(*blockinfo);
+    for (unsigned int i = blockinfo_length; i < blockinfo_length + 10; i++) {
+        bool foundBlock = false;
+        std::cout << "block " << i << std::endl;
+
+        // create 3 more blocks for parallel scan
+        std::unique_ptr<CBlockTemplate> pblocktemplate2;
+        std::unique_ptr<CBlockTemplate> pblocktemplate3;
+        std::unique_ptr<CBlockTemplate> pblocktemplate4;
+        BOOST_CHECK(pblocktemplate2 = AssemblerForTest(chainparams).CreateNewBlock(scriptPubKey));
+        BOOST_CHECK(pblocktemplate3 = AssemblerForTest(chainparams).CreateNewBlock(scriptPubKey));
+        BOOST_CHECK(pblocktemplate4 = AssemblerForTest(chainparams).CreateNewBlock(scriptPubKey));
+        for (unsigned int j = 1; j < 9; j++) {
+            std::cout << "scanning extranonce " << j << std::endl;
+            Consensus::Params params = chainparams.GetConsensus();
+            CBlock *pblock = &pblocktemplate->block; // pointer for convenience
+            CBlock *pblock2 = &pblocktemplate2->block;
+            CBlock *pblock3 = &pblocktemplate3->block;
+            CBlock *pblock4 = &pblocktemplate4->block;
+            {
+                LOCK(cs_main);
+                pblock->nVersion = 1;
+                pblock->nTime = ::ChainActive().Tip()->GetMedianTimePast()+1;
+                CMutableTransaction txCoinbase(*pblock->vtx[0]);
+                txCoinbase.nVersion = 1;
+                txCoinbase.vin[0].scriptSig = CScript();
+                txCoinbase.vin[0].scriptSig.push_back(j); // extra nonce
+                txCoinbase.vin[0].scriptSig.push_back(::ChainActive().Height());
+                txCoinbase.vout.resize(1); // Ignore the (optional) segwit commitment added by CreateNewBlock (as the hardcoded nonces don't account for this)
+                txCoinbase.vout[0].scriptPubKey = CScript();
+                pblock->vtx[0] = MakeTransactionRef(std::move(txCoinbase));
+                if (txFirst.size() == 0)
+                    baseheight = ::ChainActive().Height();
+                if (txFirst.size() < 4)
+                    txFirst.push_back(pblock->vtx[0]);
+                pblock->hashMerkleRoot = BlockMerkleRoot(*pblock);
+
+                pblock2->nVersion = 1;
+                pblock2->nTime = ::ChainActive().Tip()->GetMedianTimePast()+1;
+                CMutableTransaction txCoinbase2(*pblock2->vtx[0]);
+                txCoinbase2.nVersion = 1;
+                txCoinbase2.vin[0].scriptSig = CScript();
+                txCoinbase2.vin[0].scriptSig.push_back(j); // extra nonce
+                txCoinbase2.vin[0].scriptSig.push_back(::ChainActive().Height());
+                txCoinbase2.vout.resize(1); // Ignore the (optional) segwit commitment added by CreateNewBlock (as the hardcoded nonces don't account for this)
+                txCoinbase2.vout[0].scriptPubKey = CScript();
+                pblock2->vtx[0] = MakeTransactionRef(std::move(txCoinbase2));
+                pblock2->hashMerkleRoot = BlockMerkleRoot(*pblock2);
+
+                pblock3->nVersion = 1;
+                pblock3->nTime = ::ChainActive().Tip()->GetMedianTimePast()+1;
+                CMutableTransaction txCoinbase3(*pblock3->vtx[0]);
+                txCoinbase3.nVersion = 1;
+                txCoinbase3.vin[0].scriptSig = CScript();
+                txCoinbase3.vin[0].scriptSig.push_back(j); // extra nonce
+                txCoinbase3.vin[0].scriptSig.push_back(::ChainActive().Height());
+                txCoinbase3.vout.resize(1); // Ignore the (optional) segwit commitment added by CreateNewBlock (as the hardcoded nonces don't account for this)
+                txCoinbase3.vout[0].scriptPubKey = CScript();
+                pblock3->vtx[0] = MakeTransactionRef(std::move(txCoinbase3));
+                pblock3->hashMerkleRoot = BlockMerkleRoot(*pblock3);
+
+                /*pblock4->nVersion = 1;
+                pblock4->nTime = ::ChainActive().Tip()->GetMedianTimePast()+1;
+                CMutableTransaction txCoinbase4(*pblock4->vtx[0]);
+                txCoinbase4.nVersion = 1;
+                txCoinbase4.vin[0].scriptSig = CScript();
+                txCoinbase4.vin[0].scriptSig.push_back(j); // extra nonce
+                txCoinbase4.vin[0].scriptSig.push_back(::ChainActive().Height());
+                txCoinbase4.vout.resize(1); // Ignore the (optional) segwit commitment added by CreateNewBlock (as the hardcoded nonces don't account for this)
+                txCoinbase4.vout[0].scriptPubKey = CScript();
+                pblock4->vtx[0] = MakeTransactionRef(std::move(txCoinbase4));
+                pblock4->hashMerkleRoot = BlockMerkleRoot(*pblock4);*/
+            }
+
             bool foundNonce = false;
-            boost::thread t1{boost::bind(scanNonce, pblock, params, 0, 2147483647, &foundNonce)};
-            boost::thread t2{boost::bind(scanNonce, pblock, params, 2147483647, 4294967295, &foundNonce)};
+            unsigned int nonceValue = 0;
+            unsigned int nonceValue2 = 0;
+            unsigned int nonceValue3 = 0;
+            //unsigned int nonceValue4 = 0;
+            boost::thread t1{boost::bind(scanNonce, pblock, params, 0, 1431655765, &foundNonce, &nonceValue)};
+            boost::thread t2{boost::bind(scanNonce, pblock2, params, 1431655765, 2863311530, &foundNonce, &nonceValue2)};
+            boost::thread t3{boost::bind(scanNonce, pblock3, params, 2863311530, 4294967295 - 1, &foundNonce, &nonceValue3)};
+            //boost::thread t4{boost::bind(scanNonce, pblock4, params, 3221225469, 4294967295 - 1, &foundNonce, &nonceValue4)};
             t1.join();
             t2.join();
-        } else {
-            BOOST_CHECK(ProcessNewBlock(chainparams, shared_pblock, true, nullptr));
+            t3.join();
+            //t4.join();
+            if (foundNonce) {
+                std::shared_ptr<const CBlock> shared_pblock;
+                if (nonceValue == pblock->nNonce) {
+                    shared_pblock = std::make_shared<const CBlock>(*pblock);
+                    std::cout << "found nonce " << nonceValue << std::endl;
+                } else if (nonceValue2 == pblock2->nNonce) {
+                    shared_pblock = std::make_shared<const CBlock>(*pblock2);
+                    std::cout << "found nonce " << nonceValue2 << std::endl;
+                } else if (nonceValue3 == pblock3->nNonce) {
+                    shared_pblock = std::make_shared<const CBlock>(*pblock3);
+                    std::cout << "found nonce " << nonceValue3 << std::endl;
+                }/* else if (nonceValue4 == pblock4->nNonce) {
+                    shared_pblock = std::make_shared<const CBlock>(*pblock4);
+                    std::cout << "found nonce " << nonceValue4 << std::endl;
+                }*/
+                std::cout << "found extranonce " << j << std::endl;
+                BOOST_CHECK(ProcessNewBlock(chainparams, shared_pblock, true, nullptr));
+                pblock->hashPrevBlock = pblock->GetHash();
+                foundBlock = true;
+                break;
+            } else {
+                //BOOST_CHECK(ProcessNewBlock(chainparams, shared_pblock, true, nullptr));
+            }
         }
-        std::cout << "block hash " << pblock->GetHash() << std::endl;
-        pblock->hashPrevBlock = pblock->GetHash();
+        if (!foundBlock) {
+            break;
+        }
     }
 
     LOCK(cs_main);
