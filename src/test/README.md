@@ -29,6 +29,7 @@ implement new `BOOST_AUTO_TEST_SUITE` sections.
 To run the GUI unit tests manually, launch `src/qt/test/test_bitcoin-qt`
 
 To add more GUI unit tests, add them to the `src/qt/test/` directory and
+
 the `src/qt/test/test_main.cpp` file.
 
 ### Running individual tests
@@ -45,9 +46,9 @@ redirects the debug log, which would normally go to a file in the test datadir
 
 ... or to run just the doubledash test:
 
-    test_bitcoin --run_test=getarg_tests/doubledash
+    test_bitflate --run_test=getarg_tests/doubledash
 
-Run `test_bitcoin --help` for the full list.
+Run `test_bitflate --help` for the full list.
 
 ### Adding test cases
 

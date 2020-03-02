@@ -141,7 +141,7 @@ static UniValue getrawtransaction(const JSONRPCRequest& request)
                                          {RPCResult::Type::STR, "type", "The type, eg 'pubkeyhash'"},
                                          {RPCResult::Type::ARR, "addresses", "",
                                          {
-                                             {RPCResult::Type::STR, "address", "bitcoin address"},
+                                             {RPCResult::Type::STR, "address", "bitflate address"},
                                          }},
                                      }},
                                  }},
@@ -485,7 +485,7 @@ static UniValue decoderawtransaction(const JSONRPCRequest& request)
                                     {RPCResult::Type::STR, "type", "The type, eg 'pubkeyhash'"},
                                     {RPCResult::Type::ARR, "addresses", "",
                                     {
-                                        {RPCResult::Type::STR, "address", "bitcoin address"},
+                                        {RPCResult::Type::STR, "address", "bitflate address"},
                                     }},
                                 }},
                             }},
@@ -540,7 +540,7 @@ static UniValue decodescript(const JSONRPCRequest& request)
                         {RPCResult::Type::NUM, "reqSigs", "The required signatures"},
                         {RPCResult::Type::ARR, "addresses", "",
                         {
-                            {RPCResult::Type::STR, "address", "bitcoin address"},
+                            {RPCResult::Type::STR, "address", "bitflate address"},
                         }},
                         {RPCResult::Type::STR, "p2sh", "address of P2SH script wrapping this redeem script (not returned if the script is already a P2SH)"},
                         {RPCResult::Type::OBJ, "segwit", "Result of a witness script public key wrapping this redeem script (not returned if the script is a P2SH or witness)",
