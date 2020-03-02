@@ -1,29 +1,41 @@
-Bitcoin Core integration/staging tree
+Bitflate
 =====================================
 
-https://bitcoincore.org
-
-What is Bitcoin?
+What is Bitflate?
 ----------------
 
-Bitcoin is an experimental digital currency that enables instant payments to
-anyone, anywhere in the world. Bitcoin uses peer-to-peer technology to operate
-with no central authority: managing transactions and issuing money are carried
-out collectively by the network. Bitcoin Core is the name of open source
-software which enables the use of this currency.
+Bitflate is a Bitcoin-based crypto currency. The project is in experimental stage.
+The main differentiation of Bitflate is inflation.
+
+The goal is to create a digital native stable crypto currency, a stable coin through inflation.
+
+Bitflate Core is a fork of Bitcoin Core.
 
 For more information, as well as an immediately usable, binary version of
 the Bitcoin Core software, see https://bitcoincore.org/en/download/, or read the
 [original whitepaper](https://bitcoincore.org/bitcoin.pdf).
 
-License
+By adding inflation, we can:
+
+- Prevent price from fluctuating wildly.
+- Discourage HODL behavior, increase liquidity.
+
+Bitflate is not a Store of Value.
+
+Technical
 -------
 
-Bitcoin Core is released under the terms of the MIT license. See [COPYING](COPYING) for more
-information or see https://opensource.org/licenses/MIT.
+Bitflate is based on Bitcoin. It has the following differences:
 
-Development Process
--------------------
+- Proof of Work timespan adjustment is 3.5 days.
+- Block time is 2.5 minutes. That means 1-year halving interval.
+- For the first four halvings interval, block reward is like Bitcoin (50, 25, 12.5, 6.25). We give incentives to early adopters.
+- In subsequent intervals, there's not more halving. Coins inflate 7% per year. At this inflation rate, coin supply doubles every 10 years.
+- You can review block reward code here:
+
+https://github.com/bitflate/bitflate/blob/master/src/validation.cpp#L1243
+
+- And here's the test for block reward:
 
 The `master` branch is regularly built (see `doc/build-*.md` for instructions) and tested, but it is not guaranteed to be
 completely stable. [Tags](https://github.com/bitcoin/bitcoin/tags) are created
@@ -34,47 +46,56 @@ development of the GUI. Its master branch is identical in all monotree
 repositories. Release branches and tags do not exist, so please do not fork
 that repository unless it is for development reasons.
 
-The contribution workflow is described in [CONTRIBUTING.md](CONTRIBUTING.md)
-and useful hints for developers can be found in [doc/developer-notes.md](doc/developer-notes.md).
+- Block reward schedule:
 
-Testing
+  - 0: 50
+  - 1: 25
+  - 2: 12.5
+  - 3: 6.25 (end of halving)
+  - 4: 6.56 (start of inflation 7%)
+  - 5: 7.02
+  - 6: 7.51
+  - 7: 8.04
+  - 8: 8.60
+  - 9: 9.20
+  - 10: 9.85
+
+FAQ
 -------
 
-Testing and code review is the bottleneck for development; we get more pull
-requests than we can review and test on short notice. Please be patient and help out by testing
-other people's pull requests, and remember this is a security-critical project where any mistake might cost people
-lots of money.
+#### Why do you want to have inflation?
 
-### Automated Testing
+Bitcoin has fixed supply. The currency is deflationary. It causes price to fluctuate wildly. We think it is a good Store of Value (SoV). But for transactions, price fluctuation is a problem.
 
-Developers are strongly encouraged to write [unit tests](src/test/README.md) for new code, and to
-submit new unit tests for old code. Unit tests can be compiled and run
-(assuming they weren't disabled in configure) with: `make check`. Further details on running
-and extending unit tests can be found in [/src/test/README.md](/src/test/README.md).
+Existing stable coins are typically implemented through bank ledger. This requires 3rd party centralized banks. We want to create a stable coin through inflation. We think inflation would add liquidity to Bitflate currency.
 
-There are also [regression and integration tests](/test), written
-in Python, that are run automatically on the build server.
-These tests can be run (if the [test dependencies](/test) are installed) with: `test/functional/test_runner.py`
+#### Why Bitflate inflation rate is 7%?
 
-The Travis CI system makes sure that every pull request is built for Windows, Linux, and macOS, and that unit/sanity tests are run automatically.
+We take the reverse-Bitcoin approach of setting inflation rate fairly high. If we set the rate low, the currency may behave just like Bitcoin.
 
-### Manual Quality Assurance (QA) Testing
+If this coin ever receives widespread adoption, high inflation can meet market demand.
 
-Changes should be tested by somebody other than the developer who wrote the
-code. This is especially important for large or high-risk changes. It is useful
-to add a test plan to the pull request description if testing the changes is
-not straightforward.
+We pick the rate of 7% from Rule 72. https://en.wikipedia.org/wiki/Rule_of_72
 
-Translations
-------------
+Coin supply doubles every 10 years.
 
-Changes to translations as well as new translations can be submitted to
-[Bitcoin Core's Transifex page](https://www.transifex.com/bitcoin/bitcoin/).
+#### What is Bitflate relationship with Bitcoin?
 
-Translations are periodically pulled from Transifex and merged into the git repository. See the
-[translation process](doc/translation_process.md) for details on how this works.
+Bitflate started with Bitcoin Core codebase. It has changes in reward schedule and branding. Bitflate chain is a separate chain and has no relationship with Bitcoin.
 
-**Important**: We do not accept translation changes as GitHub pull requests because the next
-pull from Transifex would automatically overwrite them again.
+#### Can I use Bitflate for business?
 
-Translators should also subscribe to the [mailing list](https://groups.google.com/forum/#!forum/bitcoin-translators).
+Bitflate is at experimental stage as of July, 2019. We strongly advise you NOT to use it for business. The network is not secure.
+
+License
+-------
+
+Bitflate is released under the terms of the MIT license. See [COPYING](COPYING) for more
+information or see https://opensource.org/licenses/MIT.
+
+Contact
+-------
+
+Email: contact@bitflate.org
+
+Twitter: https://twitter.com/bitflate

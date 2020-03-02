@@ -116,7 +116,7 @@ from llvm.org</dd>
 </dl>
 
 If some packages are not built, for example `make NO_WALLET=1`, the appropriate
-options will be passed to bitcoin's configure. In this case, `--disable-wallet`.
+options will be passed to bitflate's configure. In this case, `--disable-wallet`.
 
 ### Additional targets
 

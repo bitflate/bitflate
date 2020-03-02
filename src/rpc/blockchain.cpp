@@ -1041,7 +1041,7 @@ UniValue gettxout(const JSONRPCRequest& request)
                                 {RPCResult::Type::STR_HEX, "hex", ""},
                                 {RPCResult::Type::NUM, "reqSigs", "Number of required signatures"},
                                 {RPCResult::Type::STR_HEX, "type", "The type, eg pubkeyhash"},
-                                {RPCResult::Type::ARR, "addresses", "array of bitcoin addresses",
+                                {RPCResult::Type::ARR, "addresses", "array of bitflate addresses",
                                     {{RPCResult::Type::STR, "address", "bitcoin address"}}},
                             }},
                         {RPCResult::Type::BOOL, "coinbase", "Coinbase or not"},

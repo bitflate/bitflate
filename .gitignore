@@ -14,6 +14,11 @@ src/test/fuzz
 src/test/test_bitcoin
 src/qt/test/test_bitcoin-qt
 
+src/bitflated
+src/bitflate-cli
+src/bitflate-tx
+src/bitflate-wallet
+
 # autoreconf
 Makefile.in
 aclocal.m4
@@ -91,9 +96,10 @@ src/qt/bitcoin-qt.includes
 # Compilation and Qt preprocessor part
 *.qm
 Makefile
+
 !depends/Makefile
-src/qt/bitcoin-qt
-Bitcoin-Qt.app
+src/qt/bitflate-qt
+Bitflate-Qt.app
 background.tiff*
 
 # Qt Creator
@@ -101,11 +107,10 @@ Makefile.am.user
 
 # Unit-tests
 Makefile.test
-bitcoin-qt_test
+bitflate-qt_test
 
 # Resources cpp
 qrc_*.cpp
-
 # Mac specific
 .DS_Store
 build
@@ -117,7 +122,7 @@ releases
 *.gcno
 *.gcda
 /*.info
-test_bitcoin.coverage/
+test_bitflate.coverage/
 total.coverage/
 coverage_percent.txt
 
@@ -142,6 +147,9 @@ db4/
 # clang-check
 *.plist
 
+.vscode/
+
 osx_volname
 dist/
 *.background.tiff
+

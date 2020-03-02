@@ -11,8 +11,8 @@
 
 #include <string>
 
-const std::string CURRENCY_UNIT = "BTC"; // One formatted unit
-const std::string CURRENCY_ATOM = "sat"; // One indivisible minimum value unit
+const std::string CURRENCY_UNIT = "BFL"; // One formatted unit
+const std::string CURRENCY_ATOM = "flat"; // One indivisible minimum value unit
 
 /* Used to determine type of fee estimation requested */
 enum class FeeEstimateMode {

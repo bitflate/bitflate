@@ -1243,13 +1243,22 @@ bool ReadRawBlockFromDisk(std::vector<uint8_t>& block, const CBlockIndex* pindex
 CAmount GetBlockSubsidy(int nHeight, const Consensus::Params& consensusParams)
 {
     int halvings = nHeight / consensusParams.nSubsidyHalvingInterval;
-    // Force block reward to zero when right shift is undefined.
-    if (halvings >= 64)
-        return 0;
-
-    CAmount nSubsidy = 50 * COIN;
-    // Subsidy is cut in half every 210,000 blocks which will occur approximately every 4 years.
-    nSubsidy >>= halvings;
+    CAmount nSubsidy = 0;
+    // Inflation starts at halving 4.
+    // At that point, we'd have 19,687,500 (~ 19 million) coins.
+    // Those are our base coins.
+    // See bitcoin supply schedule
+    // After halving 3, we calculate the inflate coin number.
+    if (halvings > 3) {
+        // calculate coin inflation for this halving
+        CAmount inflateCoins = round(19687500 * (pow(1.07, halvings - 3) - pow(1.07, halvings - 4)));
+        // subsidy is inflateCoins / 210000 * COIN
+        nSubsidy = ((int)round((inflateCoins / 210000.0) * 100)) * (COIN / 100);
+    } else {
+        nSubsidy = 50 * COIN;
+        // Subsidy is cut in half every 210,000 blocks which will occur approximately every 4 years.
+        nSubsidy >>= halvings;
+    }
     return nSubsidy;
 }
 

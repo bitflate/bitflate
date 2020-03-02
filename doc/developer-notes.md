@@ -285,7 +285,7 @@ which includes known Valgrind warnings in our dependencies that cannot be fixed
 in-tree. Example use:
 
 ```shell
-$ valgrind --suppressions=contrib/valgrind.supp src/test/test_bitcoin
+$ valgrind --suppressions=contrib/valgrind.supp src/test/test_bitflate
 $ valgrind --suppressions=contrib/valgrind.supp --leak-check=full \
       --show-leak-kinds=all src/test/test_bitcoin --log_level=test_suite
 $ valgrind -v --leak-check=full src/bitcoind -printtoconsole
@@ -305,7 +305,7 @@ To enable LCOV report generation during test runs:
 make
 make cov
 
-# A coverage report will now be accessible at `./test_bitcoin.coverage/index.html`.
+# A coverage report will now be accessible at `./test_bitflate.coverage/index.html`.
 ```
 
 ### Performance profiling with perf
@@ -476,7 +476,7 @@ Ignoring IDE/editor files
 In closed-source environments in which everyone uses the same IDE, it is common
 to add temporary files it produces to the project-wide `.gitignore` file.
 
-However, in open source software such as Bitcoin Core, where everyone uses
+However, in open source software such as Bitflate Core, where everyone uses
 their own editors/IDE/tools, it is less common. Only you know what files your
 editor produces and this may change from version to version. The canonical way
 to do this is thus to create your local gitignore. Add this to `~/.gitconfig`:
@@ -506,9 +506,9 @@ Development guidelines
 ============================
 
 A few non-style-related recommendations for developers, as well as points to
-pay attention to for reviewers of Bitcoin Core code.
+pay attention to for reviewers of Bitflate Core code.
 
-General Bitcoin Core
+General Bitflate Core
 ----------------------
 
 - New features should be exposed on RPC first, then can be made available in the GUI.
@@ -709,7 +709,7 @@ Strings and formatting
 
 - For `strprintf`, `LogPrint`, `LogPrintf` formatting characters don't need size specifiers.
 
-  - *Rationale*: Bitcoin Core uses tinyformat, which is type safe. Leave them out to avoid confusion.
+  - *Rationale*: Bitflate Core uses tinyformat, which is type safe. Leave them out to avoid confusion.
 
 - Use `.c_str()` sparingly. Its only valid use is to pass C++ strings to C functions that take NULL-terminated
   strings.
@@ -879,12 +879,12 @@ Subtrees
 
 Several parts of the repository are subtrees of software maintained elsewhere.
 
-Some of these are maintained by active developers of Bitcoin Core, in which case changes should probably go
+Some of these are maintained by active developers of Bitflate Core, in which case changes should probably go
 directly upstream without being PRed directly against the project. They will be merged back in the next
 subtree merge.
 
 Others are external projects without a tight relationship with our project. Changes to these should also
-be sent upstream, but bugfixes may also be prudent to PR against Bitcoin Core so that they can be integrated
+be sent upstream, but bugfixes may also be prudent to PR against Bitflate Core so that they can be integrated
 quickly. Cosmetic changes should be purely taken upstream.
 
 There is a tool in `test/lint/git-subtree-check.sh` ([instructions](../test/lint#git-subtree-checksh)) to check a subtree directory for consistency with
@@ -1070,7 +1070,7 @@ A few guidelines for introducing and reviewing new RPC interfaces:
 - Try not to overload methods on argument type. E.g. don't make `getblock(true)` and `getblock("hash")`
   do different things.
 
-  - *Rationale*: This is impossible to use with `bitcoin-cli`, and can be surprising to users.
+  - *Rationale*: This is impossible to use with `bitflate-cli`, and can be surprising to users.
 
   - *Exception*: Some RPC calls can take both an `int` and `bool`, most notably when a bool was switched
     to a multi-value, or due to other historical reasons. **Always** have false map to 0 and
@@ -1089,7 +1089,7 @@ A few guidelines for introducing and reviewing new RPC interfaces:
 
 - Add every non-string RPC argument `(method, idx, name)` to the table `vRPCConvertParams` in `rpc/client.cpp`.
 
-  - *Rationale*: `bitcoin-cli` and the GUI debug console use this table to determine how to
+  - *Rationale*: `bitflate-cli` and the GUI debug console use this table to determine how to
     convert a plaintext command line to JSON. If the types don't match, the method can be unusable
     from there.
 
@@ -1110,7 +1110,7 @@ A few guidelines for introducing and reviewing new RPC interfaces:
   RPCs whose behavior does *not* depend on the current chainstate may omit this
   call.
 
-  - *Rationale*: In previous versions of Bitcoin Core, the wallet was always
+  - *Rationale*: In previous versions of Bitflate Core, the wallet was always
     in-sync with the chainstate (by virtue of them all being updated in the
     same cs_main lock). In order to maintain the behavior that wallet RPCs
     return results as of at least the highest best-known block an RPC

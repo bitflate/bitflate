@@ -345,7 +345,7 @@ static UniValue setlabel(const JSONRPCRequest& request)
 
     CTxDestination dest = DecodeDestination(request.params[0].get_str());
     if (!IsValidDestination(dest)) {
-        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid Bitcoin address");
+        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid Bitflate address");
     }
 
     std::string label = LabelFromValue(request.params[1]);
@@ -507,7 +507,7 @@ static UniValue listaddressgroupings(const JSONRPCRequest& request)
                         {
                             {RPCResult::Type::ARR, "", "",
                             {
-                                {RPCResult::Type::STR, "address", "The bitcoin address"},
+                                {RPCResult::Type::STR, "address", "The bitflate address"},
                                 {RPCResult::Type::STR_AMOUNT, "amount", "The amount in " + CURRENCY_UNIT},
                                 {RPCResult::Type::STR, "label", /* optional */ true, "The label"},
                             }},
@@ -1998,7 +1998,7 @@ static UniValue encryptwallet(const JSONRPCRequest& request)
                 RPCExamples{
             "\nEncrypt your wallet\n"
             + HelpExampleCli("encryptwallet", "\"my pass phrase\"") +
-            "\nNow set the passphrase to use the wallet, such as for signing or sending bitcoin\n"
+            "\nNow set the passphrase to use the wallet, such as for signing or sending bitflate\n"
             + HelpExampleCli("walletpassphrase", "\"my pass phrase\"") +
             "\nNow we can do something like sign\n"
             + HelpExampleCli("signmessage", "\"address\" \"test message\"") +
@@ -2785,7 +2785,7 @@ static UniValue listunspent(const JSONRPCRequest& request)
             const UniValue& input = inputs[idx];
             CTxDestination dest = DecodeDestination(input.get_str());
             if (!IsValidDestination(dest)) {
-                throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, std::string("Invalid Bitcoin address: ") + input.get_str());
+                throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, std::string("Invalid Bitflate address: ") + input.get_str());
             }
             if (!destinations.insert(dest).second) {
                 throw JSONRPCError(RPC_INVALID_PARAMETER, std::string("Invalid parameter, duplicated address: ") + input.get_str());
@@ -2956,7 +2956,7 @@ void FundTransaction(CWallet* const pwallet, CMutableTransaction& tx, CAmount& f
             CTxDestination dest = DecodeDestination(options["changeAddress"].get_str());
 
             if (!IsValidDestination(dest)) {
-                throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "changeAddress must be a valid bitcoin address");
+                throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "changeAddress must be a valid bitflate address");
             }
 
             coinControl.destChange = dest;
