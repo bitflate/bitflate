@@ -27,7 +27,7 @@ AssembleBlock, 5, 700, 1.79954, 0.000510913, 0.000517018, 0.000514497
 Help
 ---------------------
 
-    src/bench/bench_bitcoin --help
+    src/bench/bench_bitflate --help
 
 To print options like scaling factor or per-benchmark filter.
 
