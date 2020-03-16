@@ -82,7 +82,10 @@ BOOST_AUTO_TEST_CASE(GetFeeTest)
     // some more integer checks
     BOOST_CHECK(CFeeRate(CAmount(26), 789) == CFeeRate(32));
     BOOST_CHECK(CFeeRate(CAmount(27), 789) == CFeeRate(34));
+    // Bitflate
     // Maximum size in bytes, should not crash
+    CFeeRate(MAX_MONEY / 1000, std::numeric_limits<size_t>::max() >> 1).GetFeePerK();
+    // This should return 0 fee
     CFeeRate(MAX_MONEY, std::numeric_limits<size_t>::max() >> 1).GetFeePerK();
 }
 
@@ -107,7 +110,7 @@ BOOST_AUTO_TEST_CASE(ToStringTest)
 {
     CFeeRate feeRate;
     feeRate = CFeeRate(1);
-    BOOST_CHECK_EQUAL(feeRate.ToString(), "0.00000001 BTC/kB");
+    BOOST_CHECK_EQUAL(feeRate.ToString(), "0.00000001 BFL/kB");
 }
 
 BOOST_AUTO_TEST_SUITE_END()
