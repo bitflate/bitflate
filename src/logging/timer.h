@@ -1,5 +1,5 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
-// Copyright (c) 2009-2018 The Bitcoin Core developers
+// Copyright (c) 2009-2019 The Bitcoin Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -85,7 +85,7 @@ private:
     const std::string m_title{};
 
     //! Forwarded on to LogPrint if specified - has the effect of only
-    //! outputing the timing log when a particular debug= category is specified.
+    //! outputting the timing log when a particular debug= category is specified.
     const BCLog::LogFlags m_log_category{};
 
 };

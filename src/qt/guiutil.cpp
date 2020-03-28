@@ -44,14 +44,20 @@
 #include <QFont>
 #include <QFontDatabase>
 #include <QFontMetrics>
+#include <QGuiApplication>
 #include <QKeyEvent>
 #include <QLineEdit>
+#include <QList>
 #include <QMouseEvent>
 #include <QProgressDialog>
+#include <QScreen>
 #include <QSettings>
+#include <QSize>
+#include <QString>
 #include <QTextDocument> // for Qt::mightBeRichText
 #include <QThread>
 #include <QUrlQuery>
+#include <QtGlobal>
 
 #if defined(Q_OS_MAC)
 
@@ -731,32 +737,33 @@ QString formatDurationStr(int secs)
     return strList.join(" ");
 }
 
+QString serviceFlagToStr(const quint64 mask, const int bit)
+{
+    switch (ServiceFlags(mask)) {
+    case NODE_NONE: abort();  // impossible
+    case NODE_NETWORK:         return "NETWORK";
+    case NODE_GETUTXO:         return "GETUTXO";
+    case NODE_BLOOM:           return "BLOOM";
+    case NODE_WITNESS:         return "WITNESS";
+    case NODE_NETWORK_LIMITED: return "NETWORK_LIMITED";
+    // Not using default, so we get warned when a case is missing
+    }
+    if (bit < 8) {
+        return QString("%1[%2]").arg("UNKNOWN").arg(mask);
+    } else {
+        return QString("%1[2^%2]").arg("UNKNOWN").arg(bit);
+    }
+}
+
 QString formatServicesStr(quint64 mask)
 {
     QStringList strList;
 
-    // Just scan the last 8 bits for now.
-    for (int i = 0; i < 8; i++) {
-        uint64_t check = 1 << i;
+    for (int i = 0; i < 64; i++) {
+        uint64_t check = 1LL << i;
         if (mask & check)
         {
-            switch (check)
-            {
-            case NODE_NETWORK:
-                strList.append("NETWORK");
-                break;
-            case NODE_GETUTXO:
-                strList.append("GETUTXO");
-                break;
-            case NODE_BLOOM:
-                strList.append("BLOOM");
-                break;
-            case NODE_WITNESS:
-                strList.append("WITNESS");
-                break;
-            default:
-                strList.append(QString("%1[%2]").arg("UNKNOWN").arg(check));
-            }
+            strList.append(serviceFlagToStr(check, i));
         }
     }
 
@@ -766,9 +773,9 @@ QString formatServicesStr(quint64 mask)
         return QObject::tr("None");
 }
 
-QString formatPingTime(double dPingTime)
+QString formatPingTime(int64_t ping_usec)
 {
-    return (dPingTime == std::numeric_limits<int64_t>::max()/1e6 || dPingTime == 0) ? QObject::tr("N/A") : QString(QObject::tr("%1 ms")).arg(QString::number((int)(dPingTime * 1000), 10));
+    return (ping_usec == std::numeric_limits<int64_t>::max() || ping_usec == 0) ? QObject::tr("N/A") : QString(QObject::tr("%1 ms")).arg(QString::number((int)(ping_usec / 1000), 10));
 }
 
 QString formatTimeOffset(int64_t nTimeOffset)
@@ -876,6 +883,25 @@ int TextWidth(const QFontMetrics& fm, const QString& text)
 #else
     return fm.width(text);
 #endif
+}
+
+void LogQtInfo()
+{
+#ifdef QT_STATIC
+    const std::string qt_link{"static"};
+#else
+    const std::string qt_link{"dynamic"};
+#endif
+#ifdef QT_STATICPLUGIN
+    const std::string plugin_link{"static"};
+#else
+    const std::string plugin_link{"dynamic"};
+#endif
+    LogPrintf("Qt %s (%s), plugin=%s (%s)\n", qVersion(), qt_link, QGuiApplication::platformName().toStdString(), plugin_link);
+    LogPrintf("System: %s, %s\n", QSysInfo::prettyProductName().toStdString(), QSysInfo::buildAbi().toStdString());
+    for (const QScreen* s : QGuiApplication::screens()) {
+        LogPrintf("Screen: %s %dx%d, pixel ratio=%.1f\n", s->name().toStdString(), s->size().width(), s->size().height(), s->devicePixelRatio());
+    }
 }
 
 } // namespace GUIUtil

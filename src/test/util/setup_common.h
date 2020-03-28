@@ -13,10 +13,14 @@
 #include <random.h>
 #include <scheduler.h>
 #include <txmempool.h>
+#include <util/string.h>
 
 #include <type_traits>
 
 #include <boost/thread.hpp>
+
+/** This is connected to the logger. Can be used to redirect logs to any other log */
+extern const std::function<void(const std::string&)> G_TEST_LOG_FUN;
 
 // Enable BOOST_CHECK_EQUAL for enum class types
 template <typename T>
@@ -82,7 +86,6 @@ private:
 struct TestingSetup : public BasicTestingSetup {
     NodeContext m_node;
     boost::thread_group threadGroup;
-    CScheduler scheduler;
 
     explicit TestingSetup(const std::string& chainName = CBaseChainParams::MAIN);
     ~TestingSetup();

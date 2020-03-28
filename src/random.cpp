@@ -1,5 +1,5 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
-// Copyright (c) 2009-2018 The Bitcoin Core developers
+// Copyright (c) 2009-2019 The Bitcoin Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -15,7 +15,7 @@
 #endif
 #include <logging.h>  // for LogPrintf()
 #include <sync.h>     // for Mutex
-#include <util/time.h> // for GetTime()
+#include <util/time.h> // for GetTimeMicros()
 
 #include <stdlib.h>
 #include <thread>
@@ -315,19 +315,16 @@ void GetOSRand(unsigned char *ent32)
         RandFailure();
     }
 #elif defined(HAVE_GETENTROPY_RAND) && defined(MAC_OSX)
-    // We need a fallback for OSX < 10.12
-    if (&getentropy != nullptr) {
-        if (getentropy(ent32, NUM_OS_RANDOM_BYTES) != 0) {
-            RandFailure();
-        }
-    } else {
-        GetDevURandom(ent32);
+    /* getentropy() is available on macOS 10.12 and later.
+     */
+    if (getentropy(ent32, NUM_OS_RANDOM_BYTES) != 0) {
+        RandFailure();
     }
 #elif defined(HAVE_SYSCTL_ARND)
-    /* FreeBSD and similar. It is possible for the call to return less
+    /* FreeBSD, NetBSD and similar. It is possible for the call to return less
      * bytes than requested, so need to read in a loop.
      */
-    static const int name[2] = {CTL_KERN, KERN_ARND};
+    static int name[2] = {CTL_KERN, KERN_ARND};
     int have = 0;
     do {
         size_t len = NUM_OS_RANDOM_BYTES - have;
@@ -517,7 +514,7 @@ static void SeedPeriodic(CSHA512& hasher, RNGState& rng) noexcept
     // Dynamic environment data (performance monitoring, ...)
     auto old_size = hasher.Size();
     RandAddDynamicEnv(hasher);
-    LogPrintf("Feeding %i bytes of dynamic environment data into RNG\n", hasher.Size() - old_size);
+    LogPrint(BCLog::RAND, "Feeding %i bytes of dynamic environment data into RNG\n", hasher.Size() - old_size);
 
     // Strengthen for 10 ms
     SeedStrengthen(hasher, rng, 10000);
@@ -537,7 +534,7 @@ static void SeedStartup(CSHA512& hasher, RNGState& rng) noexcept
 
     // Static environment data
     RandAddStaticEnv(hasher);
-    LogPrintf("Feeding %i bytes of environment data into RNG\n", hasher.Size() - old_size);
+    LogPrint(BCLog::RAND, "Feeding %i bytes of environment data into RNG\n", hasher.Size() - old_size);
 
     // Strengthen for 100 ms
     SeedStrengthen(hasher, rng, 100000);

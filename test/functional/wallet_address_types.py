@@ -82,7 +82,8 @@ class AddressTypeTest(BitcoinTestFramework):
         ]
         # whitelist all peers to speed up tx relay / mempool sync
         for args in self.extra_args:
-            args.append("-whitelist=127.0.0.1")
+            args.append("-whitelist=noban@127.0.0.1")
+        self.supports_cli = False
 
     def skip_test_if_missing_module(self):
         self.skip_if_no_wallet()

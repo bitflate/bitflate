@@ -30,6 +30,7 @@ from .util import (
     rpc_url,
     wait_until,
     p2p_port,
+    EncodeDecimal,
 )
 
 BITCOIND_PROC_WAIT_TIMEOUT = 60
@@ -59,7 +60,7 @@ class TestNode():
     To make things easier for the test writer, any unrecognised messages will
     be dispatched to the RPC connection."""
 
-    def __init__(self, i, datadir, *, chain, rpchost, timewait, bitcoind, bitcoin_cli, coverage_dir, cwd, extra_conf=None, extra_args=None, use_cli=False, start_perf=False):
+    def __init__(self, i, datadir, *, chain, rpchost, timewait, bitcoind, bitcoin_cli, coverage_dir, cwd, extra_conf=None, extra_args=None, use_cli=False, start_perf=False, use_valgrind=False, version=None):
         """
         Kwargs:
             start_perf (bool): If True, begin profiling the node with `perf` as soon as
@@ -83,6 +84,7 @@ class TestNode():
         # For those callers that need more flexibility, they can just set the args property directly.
         # Note that common args are set in the config file (see initialize_datadir)
         self.extra_args = extra_args
+        self.version = version
         # Configuration for logging is set as command-line args rather than in the bitcoin.conf file.
         # This means that starting a bitcoind using the temp dir to debug a failed test won't
         # spam debug.log.
@@ -90,12 +92,23 @@ class TestNode():
             self.binary,
             "-datadir=" + self.datadir,
             "-logtimemicros",
-            "-logthreadnames",
             "-debug",
             "-debugexclude=libevent",
             "-debugexclude=leveldb",
             "-uacomment=testnode%d" % i,
         ]
+        if use_valgrind:
+            default_suppressions_file = os.path.join(
+                os.path.dirname(os.path.realpath(__file__)),
+                "..", "..", "..", "contrib", "valgrind.supp")
+            suppressions_file = os.getenv("VALGRIND_SUPPRESSIONS_FILE",
+                                          default_suppressions_file)
+            self.args = ["valgrind", "--suppressions={}".format(suppressions_file),
+                         "--gen-suppressions=all", "--exit-on-first-error=yes",
+                         "--error-exitcode=1", "--quiet"] + self.args
+
+        if self.version is None or self.version >= 190000:
+            self.args.append("-logthreadnames")
 
         self.cli = TestNodeCLI(bitcoin_cli, self.datadir)
         self.use_cli = use_cli
@@ -244,7 +257,11 @@ class TestNode():
             return
         self.log.debug("Stopping node")
         try:
-            self.stop(wait=wait)
+            # Do not use wait argument when testing older nodes, e.g. in feature_backwards_compatibility.py
+            if self.version is None or self.version >= 180000:
+                self.stop(wait=wait)
+            else:
+                self.stop()
         except http.client.CannotSendRequest:
             self.log.exception("Unable to stop node.")
 
@@ -288,7 +305,9 @@ class TestNode():
         wait_until(self.is_node_stopped, timeout=timeout)
 
     @contextlib.contextmanager
-    def assert_debug_log(self, expected_msgs, timeout=2):
+    def assert_debug_log(self, expected_msgs, unexpected_msgs=None, timeout=2):
+        if unexpected_msgs is None:
+            unexpected_msgs = []
         time_end = time.time() + timeout
         debug_log = os.path.join(self.datadir, self.chain, 'debug.log')
         with open(debug_log, encoding='utf-8') as dl:
@@ -303,6 +322,9 @@ class TestNode():
                 dl.seek(prev_size)
                 log = dl.read()
             print_log = " - " + "\n - ".join(log.splitlines())
+            for unexpected_msg in unexpected_msgs:
+                if re.search(re.escape(unexpected_msg), log, flags=re.MULTILINE):
+                    self._raise_assertion_error('Unexpected message "{}" partially matches log:\n\n{}\n\n'.format(unexpected_msg, print_log))
             for expected_msg in expected_msgs:
                 if re.search(re.escape(expected_msg), log, flags=re.MULTILINE) is None:
                     found = False
@@ -480,7 +502,7 @@ def arg_to_cli(arg):
     if isinstance(arg, bool):
         return str(arg).lower()
     elif isinstance(arg, dict) or isinstance(arg, list):
-        return json.dumps(arg)
+        return json.dumps(arg, default=EncodeDecimal)
     else:
         return str(arg)
 
