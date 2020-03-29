@@ -224,8 +224,8 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity)
     BOOST_CHECK(pblocktemplate = AssemblerForTest(chainparams).CreateNewBlock(scriptPubKey));
 
     // We can't make transactions until we have inputs
-    // Therefore, load 110 blocks :)
-    static_assert(sizeof(blockinfo) / sizeof(*blockinfo) == 110, "Should have 110 blocks to import");
+    // Therefore, load 103 blocks :)
+    static_assert(sizeof(blockinfo) / sizeof(*blockinfo) == 103, "Should have 103 blocks to import");
     int baseheight = 0;
     std::vector<CTransactionRef> txFirst;
     for (unsigned int i = 0; i < sizeof(blockinfo)/sizeof(*blockinfo); ++i)
