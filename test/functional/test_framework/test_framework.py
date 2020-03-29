@@ -97,7 +97,7 @@ class BitcoinTestFramework(metaclass=BitcoinTestMetaClass):
         self.nodes = []
         self.network_thread = None
         self.rpc_timeout = 60  # Wait for up to 60 seconds for the RPC server to respond
-        self.supports_cli = False
+        self.supports_cli = True
         self.bind_to_localhost_only = True
         self.set_test_params()
         self.parse_args()
@@ -161,6 +161,8 @@ class BitcoinTestFramework(metaclass=BitcoinTestMetaClass):
                             help="use bitcoin-cli instead of RPC for all commands")
         parser.add_argument("--perf", dest="perf", default=False, action="store_true",
                             help="profile running nodes with perf for the duration of the test")
+        parser.add_argument("--valgrind", dest="valgrind", default=False, action="store_true",
+                            help="run nodes under the valgrind memory error detector: expect at least a ~10x slowdown, valgrind 3.14 or later required")
         parser.add_argument("--randomseed", type=int,
                             help="set a random seed for deterministically reproducing a previous test run")
         self.add_options(parser)
@@ -367,7 +369,7 @@ class BitcoinTestFramework(metaclass=BitcoinTestMetaClass):
 
     # Public helper methods. These can be accessed by the subclass test scripts.
 
-    def add_nodes(self, num_nodes, extra_args=None, *, rpchost=None, binary=None):
+    def add_nodes(self, num_nodes, extra_args=None, *, rpchost=None, binary=None, binary_cli=None, versions=None):
         """Instantiate TestNode objects.
 
         Should only be called once after the nodes have been specified in
@@ -378,11 +380,17 @@ class BitcoinTestFramework(metaclass=BitcoinTestMetaClass):
             extra_confs = [[]] * num_nodes
         if extra_args is None:
             extra_args = [[]] * num_nodes
+        if versions is None:
+            versions = [None] * num_nodes
         if binary is None:
             binary = [self.options.bitcoind] * num_nodes
+        if binary_cli is None:
+            binary_cli = [self.options.bitcoincli] * num_nodes
         assert_equal(len(extra_confs), num_nodes)
         assert_equal(len(extra_args), num_nodes)
+        assert_equal(len(versions), num_nodes)
         assert_equal(len(binary), num_nodes)
+        assert_equal(len(binary_cli), num_nodes)
         for i in range(num_nodes):
             self.nodes.append(TestNode(
                 i,
@@ -391,13 +399,15 @@ class BitcoinTestFramework(metaclass=BitcoinTestMetaClass):
                 rpchost=rpchost,
                 timewait=self.rpc_timeout,
                 bitcoind=binary[i],
-                bitcoin_cli=self.options.bitcoincli,
+                bitcoin_cli=binary_cli[i],
+                version=versions[i],
                 coverage_dir=self.options.coveragedir,
                 cwd=self.options.tmpdir,
                 extra_conf=extra_confs[i],
                 extra_args=extra_args[i],
                 use_cli=self.options.usecli,
                 start_perf=self.options.perf,
+                use_valgrind=self.options.valgrind,
             ))
 
     def start_node(self, i, *args, **kwargs):

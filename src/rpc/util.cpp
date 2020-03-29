@@ -13,6 +13,9 @@
 
 #include <tuple>
 
+const std::string UNIX_EPOCH_TIME = "UNIX epoch time";
+const std::string EXAMPLE_ADDRESS[2] = {"bc1q09vm5lfy0j5reeulh4x5752q25uqqvz34hufdl", "bc1q02ad21edsxd23d32dfgqqsz4vv4nmtfzuklhy3"};
+
 void RPCTypeCheck(const UniValue& params,
                   const std::list<UniValueType>& typesExpected,
                   bool fAllowNull)
@@ -113,8 +116,8 @@ std::string HelpExampleCli(const std::string& methodname, const std::string& arg
 
 std::string HelpExampleRpc(const std::string& methodname, const std::string& args)
 {
-    return "> curl --user myusername --data-binary '{\"jsonrpc\": \"1.0\", \"id\":\"curltest\", "
-        "\"method\": \"" + methodname + "\", \"params\": [" + args + "] }' -H 'content-type: text/plain;' http://127.0.0.1:8332/\n";
+    return "> curl --user myusername --data-binary '{\"jsonrpc\": \"1.0\", \"id\": \"curltest\", "
+        "\"method\": \"" + methodname + "\", \"params\": [" + args + "]}' -H 'content-type: text/plain;' http://127.0.0.1:8332/\n";
 }
 
 // Converts a hex string to a public key if possible
@@ -290,7 +293,7 @@ UniValue JSONRPCTransactionError(TransactionError terr, const std::string& err_s
 struct Section {
     Section(const std::string& left, const std::string& right)
         : m_left{left}, m_right{right} {}
-    const std::string m_left;
+    std::string m_left;
     const std::string m_right;
 };
 
@@ -309,20 +312,9 @@ struct Sections {
     }
 
     /**
-     * Serializing RPCArgs depends on the outer type. Only arrays and
-     * dictionaries can be nested in json. The top-level outer type is "named
-     * arguments", a mix between a dictionary and arrays.
-     */
-    enum class OuterType {
-        ARR,
-        OBJ,
-        NAMED_ARG, // Only set on first recursion
-    };
-
-    /**
      * Recursive helper to translate an RPCArg into sections
      */
-    void Push(const RPCArg& arg, const size_t current_indent = 5, const OuterType outer_type = OuterType::NAMED_ARG)
+    void Push(const RPCArg& arg, const size_t current_indent = 5, const OuterType outer_type = OuterType::NONE)
     {
         const auto indent = std::string(current_indent, ' ');
         const auto indent_next = std::string(current_indent + 2, ' ');
@@ -335,7 +327,7 @@ struct Sections {
         case RPCArg::Type::AMOUNT:
         case RPCArg::Type::RANGE:
         case RPCArg::Type::BOOL: {
-            if (outer_type == OuterType::NAMED_ARG) return; // Nothing more to do for non-recursive types on first recursion
+            if (outer_type == OuterType::NONE) return; // Nothing more to do for non-recursive types on first recursion
             auto left = indent;
             if (arg.m_type_str.size() != 0 && push_name) {
                 left += "\"" + arg.m_name + "\": " + arg.m_type_str.at(0);
@@ -348,7 +340,7 @@ struct Sections {
         }
         case RPCArg::Type::OBJ:
         case RPCArg::Type::OBJ_USER_KEYS: {
-            const auto right = outer_type == OuterType::NAMED_ARG ? "" : arg.ToDescriptionString();
+            const auto right = outer_type == OuterType::NONE ? "" : arg.ToDescriptionString();
             PushSection({indent + (push_name ? "\"" + arg.m_name + "\": " : "") + "{", right});
             for (const auto& arg_inner : arg.m_inner) {
                 Push(arg_inner, current_indent + 2, OuterType::OBJ);
@@ -356,20 +348,20 @@ struct Sections {
             if (arg.m_type != RPCArg::Type::OBJ) {
                 PushSection({indent_next + "...", ""});
             }
-            PushSection({indent + "}" + (outer_type != OuterType::NAMED_ARG ? "," : ""), ""});
+            PushSection({indent + "}" + (outer_type != OuterType::NONE ? "," : ""), ""});
             break;
         }
         case RPCArg::Type::ARR: {
             auto left = indent;
             left += push_name ? "\"" + arg.m_name + "\": " : "";
             left += "[";
-            const auto right = outer_type == OuterType::NAMED_ARG ? "" : arg.ToDescriptionString();
+            const auto right = outer_type == OuterType::NONE ? "" : arg.ToDescriptionString();
             PushSection({left, right});
             for (const auto& arg_inner : arg.m_inner) {
                 Push(arg_inner, current_indent + 2, OuterType::ARR);
             }
             PushSection({indent_next + "...", ""});
-            PushSection({indent + "]" + (outer_type != OuterType::NAMED_ARG ? "," : ""), ""});
+            PushSection({indent + "]" + (outer_type != OuterType::NONE ? "," : ""), ""});
             break;
         }
 
@@ -441,7 +433,9 @@ std::string RPCResults::ToDescriptionString() const
         } else {
             result += "\nResult (" + r.m_cond + "):\n";
         }
-        result += r.m_result;
+        Sections sections;
+        r.ToSections(sections);
+        result += sections.ToString();
     }
     return result;
 }
@@ -495,7 +489,7 @@ std::string RPCHelpMan::ToString() const
         if (i == 0) ret += "\nArguments:\n";
 
         // Push named argument name and description
-        sections.m_sections.emplace_back(std::to_string(i + 1) + ". " + arg.m_name, arg.ToDescriptionString());
+        sections.m_sections.emplace_back(::ToString(i + 1) + ". " + arg.m_name, arg.ToDescriptionString());
         sections.m_max_pad = std::max(sections.m_max_pad, sections.m_sections.back().m_left.size());
 
         // Recursively push nested args
@@ -586,6 +580,101 @@ std::string RPCArg::ToDescriptionString() const
     ret += ")";
     ret += m_description.empty() ? "" : " " + m_description;
     return ret;
+}
+
+void RPCResult::ToSections(Sections& sections, const OuterType outer_type, const int current_indent) const
+{
+    // Indentation
+    const std::string indent(current_indent, ' ');
+    const std::string indent_next(current_indent + 2, ' ');
+
+    // Elements in a JSON structure (dictionary or array) are separated by a comma
+    const std::string maybe_separator{outer_type != OuterType::NONE ? "," : ""};
+
+    // The key name if recursed into an dictionary
+    const std::string maybe_key{
+        outer_type == OuterType::OBJ ?
+            "\"" + this->m_key_name + "\" : " :
+            ""};
+
+    // Format description with type
+    const auto Description = [&](const std::string& type) {
+        return "(" + type + (this->m_optional ? ", optional" : "") + ")" +
+               (this->m_description.empty() ? "" : " " + this->m_description);
+    };
+
+    switch (m_type) {
+    case Type::ELISION: {
+        // If the inner result is empty, use three dots for elision
+        sections.PushSection({indent_next + "...", m_description});
+        return;
+    }
+    case Type::NONE: {
+        sections.PushSection({indent + "None", Description("json null")});
+        return;
+    }
+    case Type::STR: {
+        sections.PushSection({indent + maybe_key + "\"str\"" + maybe_separator, Description("string")});
+        return;
+    }
+    case Type::STR_AMOUNT: {
+        sections.PushSection({indent + maybe_key + "n" + maybe_separator, Description("numeric")});
+        return;
+    }
+    case Type::STR_HEX: {
+        sections.PushSection({indent + maybe_key + "\"hex\"" + maybe_separator, Description("string")});
+        return;
+    }
+    case Type::NUM: {
+        sections.PushSection({indent + maybe_key + "n" + maybe_separator, Description("numeric")});
+        return;
+    }
+    case Type::NUM_TIME: {
+        sections.PushSection({indent + maybe_key + "xxx" + maybe_separator, Description("numeric")});
+        return;
+    }
+    case Type::BOOL: {
+        sections.PushSection({indent + maybe_key + "true|false" + maybe_separator, Description("boolean")});
+        return;
+    }
+    case Type::ARR_FIXED:
+    case Type::ARR: {
+        sections.PushSection({indent + maybe_key + "[", Description("json array")});
+        for (const auto& i : m_inner) {
+            i.ToSections(sections, OuterType::ARR, current_indent + 2);
+        }
+        if (m_type == Type::ARR) {
+            sections.PushSection({indent_next + "...", ""});
+        } else {
+            CHECK_NONFATAL(!m_inner.empty());
+            // Remove final comma, which would be invalid JSON
+            sections.m_sections.back().m_left.pop_back();
+        }
+        sections.PushSection({indent + "]" + maybe_separator, ""});
+        return;
+    }
+    case Type::OBJ_DYN:
+    case Type::OBJ: {
+        sections.PushSection({indent + maybe_key + "{", Description("json object")});
+        for (const auto& i : m_inner) {
+            i.ToSections(sections, OuterType::OBJ, current_indent + 2);
+        }
+        if (m_type == Type::OBJ_DYN) {
+            // If the dictionary keys are dynamic, use three dots for continuation
+            sections.PushSection({indent_next + "...", ""});
+        } else {
+            CHECK_NONFATAL(!m_inner.empty());
+            // Remove final comma, which would be invalid JSON
+            sections.m_sections.back().m_left.pop_back();
+        }
+        sections.PushSection({indent + "}" + maybe_separator, ""});
+        return;
+    }
+
+        // no default case, so the compiler can warn about missing cases
+    }
+
+    CHECK_NONFATAL(false);
 }
 
 std::string RPCArg::ToStringObj(const bool oneline) const

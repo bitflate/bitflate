@@ -7,8 +7,9 @@ src/bitcoind
 src/bitcoin-cli
 src/bitcoin-tx
 src/bitcoin-wallet
+src/test/fuzz
+!src/test/fuzz/*.*
 src/test/test_bitcoin
-src/test/test_bitcoin_fuzzy
 src/qt/test/test_bitcoin-qt
 
 src/bitflated
@@ -33,6 +34,7 @@ build-aux/m4/ltversion.m4
 build-aux/missing
 build-aux/compile
 build-aux/test-driver
+config.cache
 config.log
 config.status
 configure
@@ -94,8 +96,10 @@ src/qt/bitcoin-qt.includes
 Makefile
 
 !depends/Makefile
-bitflate-qt
-bitflate-Qt.app
+
+src/qt/bitflate-qt
+Bitcoin-Qt.app
+
 background.tiff*
 
 # Qt Creator
@@ -110,6 +114,9 @@ qrc_*.cpp
 # Mac specific
 .DS_Store
 build
+
+# Previous releases
+releases
 
 #lcov
 *.gcno

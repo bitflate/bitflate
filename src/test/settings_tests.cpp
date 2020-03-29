@@ -4,12 +4,14 @@
 
 #include <util/settings.h>
 
-#include <test/util.h>
 #include <test/util/setup_common.h>
+#include <test/util/str.h>
+
 
 #include <boost/test/unit_test.hpp>
 #include <univalue.h>
 #include <util/strencodings.h>
+#include <util/string.h>
 #include <vector>
 
 BOOST_FIXTURE_TEST_SUITE(settings_tests, BasicTestingSetup)
@@ -43,6 +45,19 @@ BOOST_AUTO_TEST_CASE(Simple)
 
     // The first given arg takes precedence when specified via config file.
     CheckValues(settings2, R"("val2")", R"(["val2","val3"])");
+}
+
+// Confirm that a high priority setting overrides a lower priority setting even
+// if the high priority setting is null. This behavior is useful for a high
+// priority setting source to be able to effectively reset any setting back to
+// its default value.
+BOOST_AUTO_TEST_CASE(NullOverride)
+{
+    util::Settings settings;
+    settings.command_line_options["name"].push_back("value");
+    BOOST_CHECK_EQUAL(R"("value")", GetSetting(settings, "section", "name", false, false).write().c_str());
+    settings.forced_settings["name"] = {};
+    BOOST_CHECK_EQUAL(R"(null)", GetSetting(settings, "section", "name", false, false).write().c_str());
 }
 
 // Test different ways settings can be merged, and verify results. This test can
@@ -100,7 +115,7 @@ BOOST_FIXTURE_TEST_CASE(Merge, MergeTestingSetup)
                                std::vector<util::SettingsValue>& dest) {
             if (action == SET || action == SECTION_SET) {
                 for (int i = 0; i < 2; ++i) {
-                    dest.push_back(value_prefix + std::to_string(++value_suffix));
+                    dest.push_back(value_prefix + ToString(++value_suffix));
                     desc += " " + name_prefix + name + "=" + dest.back().get_str();
                 }
             } else if (action == NEGATE || action == SECTION_NEGATE) {

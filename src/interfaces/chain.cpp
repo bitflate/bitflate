@@ -1,4 +1,4 @@
-// Copyright (c) 2018-2019 The Bitcoin Core developers
+// Copyright (c) 2018-2020 The Bitcoin Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -38,7 +38,7 @@
 namespace interfaces {
 namespace {
 
-class LockImpl : public Chain::Lock, public UniqueLock<CCriticalSection>
+class LockImpl : public Chain::Lock, public UniqueLock<RecursiveMutex>
 {
     Optional<int> getHeight() override
     {
@@ -166,27 +166,25 @@ public:
     }
     void TransactionAddedToMempool(const CTransactionRef& tx) override
     {
-        m_notifications->TransactionAddedToMempool(tx);
+        m_notifications->transactionAddedToMempool(tx);
     }
     void TransactionRemovedFromMempool(const CTransactionRef& tx) override
     {
-        m_notifications->TransactionRemovedFromMempool(tx);
+        m_notifications->transactionRemovedFromMempool(tx);
     }
-    void BlockConnected(const std::shared_ptr<const CBlock>& block,
-        const CBlockIndex* index,
-        const std::vector<CTransactionRef>& tx_conflicted) override
+    void BlockConnected(const std::shared_ptr<const CBlock>& block, const CBlockIndex* index) override
     {
-        m_notifications->BlockConnected(*block, tx_conflicted, index->nHeight);
+        m_notifications->blockConnected(*block, index->nHeight);
     }
     void BlockDisconnected(const std::shared_ptr<const CBlock>& block, const CBlockIndex* index) override
     {
-        m_notifications->BlockDisconnected(*block, index->nHeight);
+        m_notifications->blockDisconnected(*block, index->nHeight);
     }
     void UpdatedBlockTip(const CBlockIndex* index, const CBlockIndex* fork_index, bool is_ibd) override
     {
-        m_notifications->UpdatedBlockTip();
+        m_notifications->updatedBlockTip();
     }
-    void ChainStateFlushed(const CBlockLocator& locator) override { m_notifications->ChainStateFlushed(locator); }
+    void ChainStateFlushed(const CBlockLocator& locator) override { m_notifications->chainStateFlushed(locator); }
     Chain& m_chain;
     Chain::Notifications* m_notifications;
 };
@@ -236,11 +234,10 @@ public:
     explicit ChainImpl(NodeContext& node) : m_node(node) {}
     std::unique_ptr<Chain::Lock> lock(bool try_lock) override
     {
-        auto result = MakeUnique<LockImpl>(::cs_main, "cs_main", __FILE__, __LINE__, try_lock);
-        if (try_lock && result && !*result) return {};
-        // std::move necessary on some compilers due to conversion from
-        // LockImpl to Lock pointer
-        return std::move(result);
+        auto lock = MakeUnique<LockImpl>(::cs_main, "cs_main", __FILE__, __LINE__, try_lock);
+        if (try_lock && lock && !*lock) return {};
+        std::unique_ptr<Chain::Lock> result = std::move(lock); // Temporary to avoid CWG 1579
+        return result;
     }
     bool findBlock(const uint256& hash, CBlock* block, int64_t* time, int64_t* time_max) override
     {
@@ -263,7 +260,7 @@ public:
         }
         return true;
     }
-    void findCoins(std::map<COutPoint, Coin>& coins) override { return FindCoins(coins); }
+    void findCoins(std::map<COutPoint, Coin>& coins) override { return FindCoins(m_node, coins); }
     double guessVerificationProgress(const uint256& block_hash) override
     {
         LOCK(cs_main);
@@ -280,7 +277,10 @@ public:
         auto it = ::mempool.GetIter(txid);
         return it && (*it)->GetCountWithDescendants() > 1;
     }
-    bool broadcastTransaction(const CTransactionRef& tx, std::string& err_string, const CAmount& max_tx_fee, bool relay) override
+    bool broadcastTransaction(const CTransactionRef& tx,
+        const CAmount& max_tx_fee,
+        bool relay,
+        std::string& err_string) override
     {
         const TransactionError err = BroadcastTransaction(m_node, tx, err_string, max_tx_fee, relay, /*wait_callback*/ false);
         // Chain clients only care about failures to accept the tx to the mempool. Disregard non-mempool related failures.
@@ -338,7 +338,6 @@ public:
     void initMessage(const std::string& message) override { ::uiInterface.InitMessage(message); }
     void initWarning(const std::string& message) override { InitWarning(message); }
     void initError(const std::string& message) override { InitError(message); }
-    void loadWallet(std::unique_ptr<Wallet> wallet) override { ::uiInterface.LoadWallet(wallet); }
     void showProgress(const std::string& title, int progress, bool resume_possible) override
     {
         ::uiInterface.ShowProgress(title, progress, resume_possible);
@@ -369,7 +368,7 @@ public:
     {
         LOCK2(::cs_main, ::mempool.cs);
         for (const CTxMemPoolEntry& entry : ::mempool.mapTx) {
-            notifications.TransactionAddedToMempool(entry.GetSharedTx());
+            notifications.transactionAddedToMempool(entry.GetSharedTx());
         }
     }
     NodeContext& m_node;

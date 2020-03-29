@@ -15,6 +15,7 @@
 #include <chainparams.h>
 #include <util/memory.h>
 #include <util/system.h>
+#include <util/string.h>
 
 #include <memory>
 
@@ -85,7 +86,7 @@ BOOST_AUTO_TEST_CASE(cnode_listen_port)
     BOOST_CHECK(port == Params().GetDefaultPort());
     // test set port
     unsigned short altPort = 12345;
-    BOOST_CHECK(gArgs.SoftSetArg("-port", std::to_string(altPort)));
+    BOOST_CHECK(gArgs.SoftSetArg("-port", ToString(altPort)));
     port = GetListenPort();
     BOOST_CHECK(port == altPort);
 }
@@ -99,6 +100,8 @@ BOOST_AUTO_TEST_CASE(caddrdb_read)
     BOOST_CHECK(Lookup("250.7.1.1", addr1, 8333, false));
     BOOST_CHECK(Lookup("250.7.2.2", addr2, 9999, false));
     BOOST_CHECK(Lookup("250.7.3.3", addr3, 9999, false));
+    BOOST_CHECK(Lookup(std::string("250.7.3.3", 9), addr3, 9999, false));
+    BOOST_CHECK(!Lookup(std::string("250.7.3.3\0example.com", 21), addr3, 9999, false));
 
     // Add three addresses to new table.
     CService source;

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Copyright (c) 2018 The Bitcoin Core developers
+# Copyright (c) 2018-2019 The Bitcoin Core developers
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -8,20 +8,16 @@ export LC_ALL=C.UTF-8
 
 if [ -n "$QEMU_USER_CMD" ]; then
   BEGIN_FOLD wrap-qemu
-  echo "Prepare to run functional tests for HOST=$HOST"
   # Generate all binaries, so that they can be wrapped
   DOCKER_EXEC make $MAKEJOBS -C src/secp256k1 VERBOSE=1
   DOCKER_EXEC make $MAKEJOBS -C src/univalue VERBOSE=1
-  for b_name in {"${BASE_OUTDIR}/bin"/*,src/secp256k1/*tests,src/univalue/{no_nul,test_json,unitester,object}}; do
-    # shellcheck disable=SC2044
-    for b in $(find "${BASE_ROOT_DIR}" -executable -type f -name $(basename $b_name)); do
-      echo "Wrap $b ..."
-      DOCKER_EXEC mv "$b" "${b}_orig"
-      DOCKER_EXEC echo "\#\!/usr/bin/env bash" \> "$b"
-      DOCKER_EXEC echo "$QEMU_USER_CMD \\\"${b}_orig\\\" \\\"\\\$@\\\"" \>\> "$b"
-      DOCKER_EXEC chmod +x "$b"
-    done
-  done
+  DOCKER_EXEC "${BASE_ROOT_DIR}/ci/test/wrap-qemu.sh"
+  END_FOLD
+fi
+
+if [ -n "$USE_VALGRIND" ]; then
+  BEGIN_FOLD wrap-valgrind
+  DOCKER_EXEC "${BASE_ROOT_DIR}/ci/test/wrap-valgrind.sh"
   END_FOLD
 fi
 
@@ -40,6 +36,6 @@ fi
 
 if [ "$RUN_FUZZ_TESTS" = "true" ]; then
   BEGIN_FOLD fuzz-tests
-  DOCKER_EXEC test/fuzz/test_runner.py -l DEBUG ${DIR_FUZZ_IN}
+  DOCKER_EXEC test/fuzz/test_runner.py ${FUZZ_TESTS_CONFIG} -l DEBUG ${DIR_FUZZ_IN}
   END_FOLD
 fi
