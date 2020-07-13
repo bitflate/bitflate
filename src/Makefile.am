@@ -86,7 +86,7 @@ if BUILD_BITCOIND
 endif
 
 if BUILD_BITCOIN_NODE
-  bin_PROGRAMS += bitcoin-node
+  bin_PROGRAMS += bitflate-node
 endif
 
 if BUILD_BITCOIN_CLI
@@ -273,7 +273,7 @@ obj/build.h: FORCE
 	  "$(abs_top_srcdir)"
 libbitcoin_util_a-clientversion.$(OBJEXT): obj/build.h
 
-# server: shared between bitflated and bitflate-qt
+# server: shared between bitcoind and bitcoin-qt
 # Contains code accessing mempool and chain state that is meant to be separated
 # from wallet and gui code (see node/README.md). Shared code should go in
 # libbitcoin_common or libbitcoin_util libraries, instead.
@@ -347,7 +347,7 @@ libbitcoin_zmq_a_SOURCES = \
 endif
 
 
-# wallet: shared between bitflated and bitflate-qt, but only linked
+# wallet: shared between bitcoind and bitcoin-qt, but only linked
 # when wallet enabled
 libbitcoin_wallet_a_CPPFLAGS = $(AM_CPPFLAGS) $(BITCOIN_INCLUDES)
 libbitcoin_wallet_a_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
@@ -466,7 +466,7 @@ libbitcoin_consensus_a_SOURCES = \
   util/strencodings.h \
   version.h
 
-# common: shared between bitflated, and bitflate-qt and non-server tools
+# common: shared between bitcoind, and bitcoin-qt and non-server tools
 libbitcoin_common_a_CPPFLAGS = $(AM_CPPFLAGS) $(BITCOIN_INCLUDES)
 libbitcoin_common_a_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
 libbitcoin_common_a_SOURCES = \
@@ -547,7 +547,7 @@ libbitcoin_util_a_SOURCES += compat/glibc_compat.cpp
 AM_LDFLAGS += $(COMPAT_LDFLAGS)
 endif
 
-# cli: shared between bitcoin-cli and bitflate-qt
+# cli: shared between bitcoin-cli and bitcoin-qt
 libbitcoin_cli_a_CPPFLAGS = $(AM_CPPFLAGS) $(BITCOIN_INCLUDES)
 libbitcoin_cli_a_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
 libbitcoin_cli_a_SOURCES = \
@@ -566,7 +566,7 @@ bitcoin_bin_cxxflags = $(AM_CXXFLAGS) $(PIE_FLAGS)
 bitcoin_bin_ldflags = $(RELDFLAGS) $(AM_LDFLAGS) $(LIBTOOL_APP_LDFLAGS)
 
 if TARGET_WINDOWS
-bitcoin_daemon_sources += bitflated-res.rc
+bitcoin_daemon_sources += bitcoind-res.rc
 endif
 
 bitcoin_bin_ldadd = \
@@ -584,19 +584,19 @@ bitcoin_bin_ldadd = \
 
 bitcoin_bin_ldadd += $(BOOST_LIBS) $(BDB_LIBS) $(MINIUPNPC_LIBS) $(EVENT_PTHREADS_LIBS) $(EVENT_LIBS) $(ZMQ_LIBS)
 
-bitcoind_SOURCES = $(bitcoin_daemon_sources)
-bitcoind_CPPFLAGS = $(bitcoin_bin_cppflags)
-bitcoind_CXXFLAGS = $(bitcoin_bin_cxxflags)
-bitcoind_LDFLAGS = $(bitcoin_bin_ldflags)
-bitcoind_LDADD = $(LIBBITCOIN_SERVER) $(bitcoin_bin_ldadd)
+bitflated_SOURCES = $(bitcoin_daemon_sources)
+bitflated_CPPFLAGS = $(bitcoin_bin_cppflags)
+bitflated_CXXFLAGS = $(bitcoin_bin_cxxflags)
+bitflated_LDFLAGS = $(bitcoin_bin_ldflags)
+bitflated_LDADD = $(LIBBITCOIN_SERVER) $(bitcoin_bin_ldadd)
 
-bitcoin_node_SOURCES = $(bitcoin_daemon_sources)
-bitcoin_node_CPPFLAGS = $(bitcoin_bin_cppflags)
-bitcoin_node_CXXFLAGS = $(bitcoin_bin_cxxflags)
-bitcoin_node_LDFLAGS = $(bitcoin_bin_ldflags)
-bitcoin_node_LDADD = $(LIBBITCOIN_SERVER) $(bitcoin_bin_ldadd)
+bitflate_node_SOURCES = $(bitcoin_daemon_sources)
+bitflate_node_CPPFLAGS = $(bitcoin_bin_cppflags)
+bitflate_node_CXXFLAGS = $(bitcoin_bin_cxxflags)
+bitflate_node_LDFLAGS = $(bitcoin_bin_ldflags)
+bitflate_node_LDADD = $(LIBBITCOIN_SERVER) $(bitcoin_bin_ldadd)
 
-# bitflate-cli binary #
+# bitcoin-cli binary #
 bitflate_cli_SOURCES = bitcoin-cli.cpp
 bitflate_cli_CPPFLAGS = $(AM_CPPFLAGS) $(BITCOIN_INCLUDES) $(EVENT_CFLAGS)
 bitflate_cli_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
@@ -615,7 +615,7 @@ bitflate_cli_LDADD = \
 bitflate_cli_LDADD += $(BOOST_LIBS) $(EVENT_LIBS)
 #
 
-# bitflate-tx binary #
+# bitcoin-tx binary #
 bitflate_tx_SOURCES = bitcoin-tx.cpp
 bitflate_tx_CPPFLAGS = $(AM_CPPFLAGS) $(BITCOIN_INCLUDES)
 bitflate_tx_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
@@ -637,16 +637,15 @@ bitflate_tx_LDADD += $(BOOST_LIBS)
 #
 
 # bitcoin-wallet binary #
-bitcoin_wallet_SOURCES = bitcoin-wallet.cpp
-bitcoin_wallet_CPPFLAGS = $(bitcoin_bin_cppflags)
-bitcoin_wallet_CXXFLAGS = $(bitcoin_bin_cxxflags)
-bitcoin_wallet_LDFLAGS = $(bitcoin_bin_ldflags)
-bitcoin_wallet_LDADD = $(LIBBITCOIN_WALLET_TOOL) $(bitcoin_bin_ldadd)
+bitflate_wallet_SOURCES = bitcoin-wallet.cpp
+bitflate_wallet_CPPFLAGS = $(bitcoin_bin_cppflags)
+bitflate_wallet_CXXFLAGS = $(bitcoin_bin_cxxflags)
+bitflate_wallet_LDFLAGS = $(bitcoin_bin_ldflags)
+bitflate_wallet_LDADD = $(LIBBITCOIN_WALLET_TOOL) $(bitcoin_bin_ldadd)
 
 if TARGET_WINDOWS
 bitflate_wallet_SOURCES += bitcoin-wallet-res.rc
 endif
-
 #
 
 # bitcoinconsensus library #
