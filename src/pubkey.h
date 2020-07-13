@@ -142,6 +142,9 @@ public:
         unsigned int len = ::ReadCompactSize(s);
         if (len <= SIZE) {
             s.read((char*)vch, len);
+            if (len != size()) {
+                Invalidate();
+            }
         } else {
             // invalid pubkey, skip available data
             char dummy;
@@ -217,6 +220,11 @@ struct CExtPubKey {
             a.nChild == b.nChild &&
             a.chaincode == b.chaincode &&
             a.pubkey == b.pubkey;
+    }
+
+    friend bool operator!=(const CExtPubKey &a, const CExtPubKey &b)
+    {
+        return !(a == b);
     }
 
     void Encode(unsigned char code[BIP32_EXTKEY_SIZE]) const;

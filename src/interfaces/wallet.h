@@ -1,4 +1,4 @@
-// Copyright (c) 2018-2019 The Bitcoin Core developers
+// Copyright (c) 2018-2020 The Bitcoin Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -9,13 +9,12 @@
 #include <pubkey.h>                    // For CKeyID and CScriptID (definitions needed in CTxDestination instantiation)
 #include <script/standard.h>           // For CTxDestination
 #include <support/allocators/secure.h> // For SecureString
-#include <ui_interface.h>              // For ChangeType
 #include <util/message.h>
+#include <util/ui_change_type.h>
 
 #include <functional>
 #include <map>
 #include <memory>
-#include <psbt.h>
 #include <stdint.h>
 #include <string>
 #include <tuple>
@@ -26,12 +25,14 @@ class CCoinControl;
 class CFeeRate;
 class CKey;
 class CWallet;
-enum isminetype : unsigned int;
 enum class FeeReason;
-typedef uint8_t isminefilter;
-
 enum class OutputType;
+enum class TransactionError;
+enum isminetype : unsigned int;
 struct CRecipient;
+struct PartiallySignedTransaction;
+struct bilingual_str;
+typedef uint8_t isminefilter;
 
 namespace interfaces {
 
@@ -136,7 +137,7 @@ public:
         bool sign,
         int& change_pos,
         CAmount& fee,
-        std::string& fail_reason) = 0;
+        bilingual_str& fail_reason) = 0;
 
     //! Commit transaction.
     virtual void commitTransaction(CTransactionRef tx,
@@ -155,7 +156,7 @@ public:
     //! Create bump transaction.
     virtual bool createBumpTransaction(const uint256& txid,
         const CCoinControl& coin_control,
-        std::vector<std::string>& errors,
+        std::vector<bilingual_str>& errors,
         CAmount& old_fee,
         CAmount& new_fee,
         CMutableTransaction& mtx) = 0;
@@ -166,7 +167,7 @@ public:
     //! Commit bump transaction.
     virtual bool commitBumpTransaction(const uint256& txid,
         CMutableTransaction&& mtx,
-        std::vector<std::string>& errors,
+        std::vector<bilingual_str>& errors,
         uint256& bumped_txid) = 0;
 
     //! Get a transaction.
@@ -196,13 +197,14 @@ public:
         bool sign,
         bool bip32derivs,
         PartiallySignedTransaction& psbtx,
-        bool& complete) = 0;
+        bool& complete,
+        size_t* n_signed) = 0;
 
     //! Get balances.
     virtual WalletBalances getBalances() = 0;
 
     //! Get balances if possible without blocking.
-    virtual bool tryGetBalances(WalletBalances& balances, int& num_blocks) = 0;
+    virtual bool tryGetBalances(WalletBalances& balances, uint256& block_hash) = 0;
 
     //! Get balance.
     virtual CAmount getBalance() = 0;
@@ -254,14 +256,14 @@ public:
     // Get default address type.
     virtual OutputType getDefaultAddressType() = 0;
 
-    // Get default change type.
-    virtual OutputType getDefaultChangeType() = 0;
-
     //! Get max tx fee.
     virtual CAmount getDefaultMaxTxFee() = 0;
 
     // Remove wallet.
     virtual void remove() = 0;
+
+    //! Return whether is a legacy wallet
+    virtual bool isLegacy() = 0;
 
     //! Register handler for unload message.
     using UnloadFn = std::function<void()>;
@@ -294,6 +296,9 @@ public:
     //! Register handler for keypool changed messages.
     using CanGetAddressesChangedFn = std::function<void()>;
     virtual std::unique_ptr<Handler> handleCanGetAddressesChanged(CanGetAddressesChangedFn fn) = 0;
+
+    //! Return pointer to internal wallet class, useful for testing.
+    virtual CWallet* wallet() { return nullptr; }
 };
 
 //! Information about one wallet address.

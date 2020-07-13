@@ -1,10 +1,11 @@
-// Copyright (c) 2017-2019 The Bitcoin Core developers
+// Copyright (c) 2017-2020 The Bitcoin Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #ifndef BITCOIN_RPC_UTIL_H
 #define BITCOIN_RPC_UTIL_H
 
+#include <node/coinstats.h>
 #include <node/transaction.h>
 #include <outputtype.h>
 #include <protocol.h>
@@ -77,6 +78,8 @@ extern uint256 ParseHashO(const UniValue& o, std::string strKey);
 extern std::vector<unsigned char> ParseHexV(const UniValue& v, std::string strName);
 extern std::vector<unsigned char> ParseHexO(const UniValue& o, std::string strKey);
 
+CoinStatsHashType ParseHashType(const UniValue& param, const CoinStatsHashType default_type);
+
 extern CAmount AmountFromValue(const UniValue& value);
 extern std::string HelpExampleCli(const std::string& methodname, const std::string& args);
 extern std::string HelpExampleRpc(const std::string& methodname, const std::string& args);
@@ -142,7 +145,7 @@ struct RPCArg {
         OMITTED,
     };
     using Fallback = boost::variant<Optional, /* default value for optional args */ std::string>;
-    const std::string m_name; //!< The name of the arg (can be empty for inner args)
+    const std::string m_names; //!< The name of the arg (can be empty for inner args, can contain multiple aliases separated by | for named request arguments)
     const Type m_type;
     const std::vector<RPCArg> m_inner; //!< Only used for arrays or dicts
     const Fallback m_fallback;
@@ -157,7 +160,7 @@ struct RPCArg {
         const std::string description,
         const std::string oneline_description = "",
         const std::vector<std::string> type_str = {})
-        : m_name{std::move(name)},
+        : m_names{std::move(name)},
           m_type{std::move(type)},
           m_fallback{std::move(fallback)},
           m_description{std::move(description)},
@@ -175,7 +178,7 @@ struct RPCArg {
         const std::vector<RPCArg> inner,
         const std::string oneline_description = "",
         const std::vector<std::string> type_str = {})
-        : m_name{std::move(name)},
+        : m_names{std::move(name)},
           m_type{std::move(type)},
           m_inner{std::move(inner)},
           m_fallback{std::move(fallback)},
@@ -187,6 +190,12 @@ struct RPCArg {
     }
 
     bool IsOptional() const;
+
+    /** Return the first of all aliases */
+    std::string GetFirstName() const;
+
+    /** Return the name, throws when there are aliases */
+    std::string GetName() const;
 
     /**
      * Return the type string of the argument.

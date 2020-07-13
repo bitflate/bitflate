@@ -30,7 +30,10 @@ class BIP68Test(BitcoinTestFramework):
     def set_test_params(self):
         self.num_nodes = 2
         self.extra_args = [
-            ["-acceptnonstdtxn=1"],
+            [
+                "-acceptnonstdtxn=1",
+                "-peertimeout=9999",  # bump because mocktime might cause a disconnect otherwise
+            ],
             ["-acceptnonstdtxn=0"],
         ]
 
@@ -324,7 +327,7 @@ class BIP68Test(BitcoinTestFramework):
             block.solve()
             tip = block.sha256
             height += 1
-            self.nodes[0].submitblock(ToHex(block))
+            assert_equal(None if i == 1 else 'inconclusive', self.nodes[0].submitblock(ToHex(block)))
             cur_time += 1
 
         mempool = self.nodes[0].getrawmempool()
@@ -381,7 +384,7 @@ class BIP68Test(BitcoinTestFramework):
         add_witness_commitment(block)
         block.solve()
 
-        self.nodes[0].submitblock(block.serialize().hex())
+        assert_equal(None, self.nodes[0].submitblock(block.serialize().hex()))
         assert_equal(self.nodes[0].getbestblockhash(), block.hash)
 
     def activateCSV(self):

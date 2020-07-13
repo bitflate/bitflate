@@ -1,4 +1,4 @@
-// Copyright (c) 2009-2019 The Bitcoin Core developers
+// Copyright (c) 2009-2020 The Bitcoin Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -12,7 +12,7 @@
 #include <compat.h>
 #include <serialize.h>
 
-#include <stdint.h>
+#include <cstdint>
 #include <string>
 #include <vector>
 
@@ -90,6 +90,7 @@ class CNetAddr
         uint32_t GetMappedAS(const std::vector<bool> &asmap) const;
 
         std::vector<unsigned char> GetGroup(const std::vector<bool> &asmap) const;
+        std::vector<unsigned char> GetAddrBytes() const { return {std::begin(ip), std::end(ip)}; }
         int GetReachabilityFrom(const CNetAddr *paddrPartner = nullptr) const;
 
         explicit CNetAddr(const struct in6_addr& pipv6Addr, const uint32_t scope = 0);
@@ -99,12 +100,7 @@ class CNetAddr
         friend bool operator!=(const CNetAddr& a, const CNetAddr& b) { return !(a == b); }
         friend bool operator<(const CNetAddr& a, const CNetAddr& b);
 
-        ADD_SERIALIZE_METHODS;
-
-        template <typename Stream, typename Operation>
-        inline void SerializationOp(Stream& s, Operation ser_action) {
-            READWRITE(ip);
-        }
+        SERIALIZE_METHODS(CNetAddr, obj) { READWRITE(obj.ip); }
 
         friend class CSubNet;
 };
@@ -136,14 +132,7 @@ class CSubNet
         friend bool operator!=(const CSubNet& a, const CSubNet& b) { return !(a == b); }
         friend bool operator<(const CSubNet& a, const CSubNet& b);
 
-        ADD_SERIALIZE_METHODS;
-
-        template <typename Stream, typename Operation>
-        inline void SerializationOp(Stream& s, Operation ser_action) {
-            READWRITE(network);
-            READWRITE(netmask);
-            READWRITE(valid);
-        }
+        SERIALIZE_METHODS(CSubNet, obj) { READWRITE(obj.network, obj.netmask, obj.valid); }
 };
 
 /** A combination of a network address (CNetAddr) and a (TCP) port */
@@ -154,10 +143,10 @@ class CService : public CNetAddr
 
     public:
         CService();
-        CService(const CNetAddr& ip, unsigned short port);
-        CService(const struct in_addr& ipv4Addr, unsigned short port);
+        CService(const CNetAddr& ip, uint16_t port);
+        CService(const struct in_addr& ipv4Addr, uint16_t port);
         explicit CService(const struct sockaddr_in& addr);
-        unsigned short GetPort() const;
+        uint16_t GetPort() const;
         bool GetSockAddr(struct sockaddr* paddr, socklen_t *addrlen) const;
         bool SetSockAddr(const struct sockaddr* paddr);
         friend bool operator==(const CService& a, const CService& b);
@@ -168,16 +157,12 @@ class CService : public CNetAddr
         std::string ToStringPort() const;
         std::string ToStringIPPort() const;
 
-        CService(const struct in6_addr& ipv6Addr, unsigned short port);
+        CService(const struct in6_addr& ipv6Addr, uint16_t port);
         explicit CService(const struct sockaddr_in6& addr);
 
-        ADD_SERIALIZE_METHODS;
-
-        template <typename Stream, typename Operation>
-        inline void SerializationOp(Stream& s, Operation ser_action) {
-            READWRITE(ip);
-            READWRITE(WrapBigEndian(port));
-        }
+        SERIALIZE_METHODS(CService, obj) { READWRITE(obj.ip, Using<BigEndianFormatter<2>>(obj.port)); }
 };
+
+bool SanityCheckASMap(const std::vector<bool>& asmap);
 
 #endif // BITCOIN_NETADDRESS_H

@@ -3,13 +3,11 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include <index/txindex.h>
+#include <node/ui_interface.h>
 #include <shutdown.h>
-#include <ui_interface.h>
 #include <util/system.h>
 #include <util/translation.h>
 #include <validation.h>
-
-#include <boost/thread.hpp>
 
 constexpr char DB_BEST_BLOCK = 'B';
 constexpr char DB_TXINDEX = 't';
@@ -21,12 +19,10 @@ struct CDiskTxPos : public FlatFilePos
 {
     unsigned int nTxOffset; // after header
 
-    ADD_SERIALIZE_METHODS;
-
-    template <typename Stream, typename Operation>
-    inline void SerializationOp(Stream& s, Operation ser_action) {
-        READWRITEAS(FlatFilePos, *this);
-        READWRITE(VARINT(nTxOffset));
+    SERIALIZE_METHODS(CDiskTxPos, obj)
+    {
+        READWRITEAS(FlatFilePos, obj);
+        READWRITE(VARINT(obj.nTxOffset));
     }
 
     CDiskTxPos(const FlatFilePos &blockIn, unsigned int nTxOffsetIn) : FlatFilePos(blockIn.nFile, blockIn.nPos), nTxOffset(nTxOffsetIn) {
@@ -152,7 +148,6 @@ bool TxIndex::DB::MigrateData(CBlockTreeDB& block_tree_db, const CBlockLocator& 
     bool interrupted = false;
     std::unique_ptr<CDBIterator> cursor(block_tree_db.NewIterator());
     for (cursor->Seek(begin_key); cursor->Valid(); cursor->Next()) {
-        boost::this_thread::interruption_point();
         if (ShutdownRequested()) {
             interrupted = true;
             break;

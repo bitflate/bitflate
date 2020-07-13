@@ -12,6 +12,9 @@
 #include <rpc/server.h>
 #include <rpc/util.h>
 #include <script/descriptor.h>
+#include <script/script.h>
+#include <serialize.h>
+#include <streams.h>
 #include <test/fuzz/FuzzedDataProvider.h>
 #include <test/fuzz/fuzz.h>
 #include <test/fuzz/util.h>
@@ -24,6 +27,7 @@
 #include <util/system.h>
 #include <util/translation.h>
 #include <util/url.h>
+#include <version.h>
 
 #include <cstdint>
 #include <string>
@@ -86,4 +90,44 @@ void test_one_input(const std::vector<uint8_t>& buffer)
     (void)urlDecode(random_string_1);
     (void)ValidAsCString(random_string_1);
     (void)_(random_string_1.c_str());
+    try {
+        throw scriptnum_error{random_string_1};
+    } catch (const std::runtime_error&) {
+    }
+
+    {
+        CDataStream data_stream{SER_NETWORK, INIT_PROTO_VERSION};
+        std::string s;
+        auto limited_string = LIMITED_STRING(s, 10);
+        data_stream << random_string_1;
+        try {
+            data_stream >> limited_string;
+            assert(data_stream.empty());
+            assert(s.size() <= random_string_1.size());
+            assert(s.size() <= 10);
+            if (!random_string_1.empty()) {
+                assert(!s.empty());
+            }
+        } catch (const std::ios_base::failure&) {
+        }
+    }
+    {
+        CDataStream data_stream{SER_NETWORK, INIT_PROTO_VERSION};
+        const auto limited_string = LIMITED_STRING(random_string_1, 10);
+        data_stream << limited_string;
+        std::string deserialized_string;
+        data_stream >> deserialized_string;
+        assert(data_stream.empty());
+        assert(deserialized_string == random_string_1);
+    }
+    {
+        int64_t amount_out;
+        (void)ParseFixedPoint(random_string_1, fuzzed_data_provider.ConsumeIntegralInRange<int>(0, 1024), &amount_out);
+    }
+    {
+        (void)Untranslated(random_string_1);
+        const bilingual_str bs1{random_string_1, random_string_2};
+        const bilingual_str bs2{random_string_2, random_string_1};
+        (void)(bs1 + bs2);
+    }
 }

@@ -1,4 +1,4 @@
-// Copyright (c) 2015-2019 The Bitcoin Core developers
+// Copyright (c) 2015-2020 The Bitcoin Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -11,13 +11,13 @@
 #include <node/context.h>
 #include <pubkey.h>
 #include <random.h>
-#include <scheduler.h>
 #include <txmempool.h>
+#include <util/check.h>
 #include <util/string.h>
 
 #include <type_traits>
 
-#include <boost/thread.hpp>
+#include <boost/thread/thread.hpp>
 
 /** This is connected to the logger. Can be used to redirect logs to any other log */
 extern const std::function<void(const std::string&)> G_TEST_LOG_FUN;
@@ -73,9 +73,11 @@ static constexpr CAmount CENT{1000000};
  */
 struct BasicTestingSetup {
     ECCVerifyHandle globalVerifyHandle;
+    NodeContext m_node;
 
-    explicit BasicTestingSetup(const std::string& chainName = CBaseChainParams::MAIN);
+    explicit BasicTestingSetup(const std::string& chainName = CBaseChainParams::MAIN, const std::vector<const char*>& extra_args = {});
     ~BasicTestingSetup();
+
 private:
     const fs::path m_path_root;
 };
@@ -84,10 +86,9 @@ private:
  * Included are coins database, script check threads setup.
  */
 struct TestingSetup : public BasicTestingSetup {
-    NodeContext m_node;
     boost::thread_group threadGroup;
 
-    explicit TestingSetup(const std::string& chainName = CBaseChainParams::MAIN);
+    explicit TestingSetup(const std::string& chainName = CBaseChainParams::MAIN, const std::vector<const char*>& extra_args = {});
     ~TestingSetup();
 };
 

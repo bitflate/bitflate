@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Copyright (c) 2014-2019 The Bitcoin Core developers
+# Copyright (c) 2014-2020 The Bitcoin Core developers
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
 """Test the fundrawtransaction RPC."""
@@ -271,7 +271,11 @@ class RawTransactionsTest(BitcoinTestFramework):
         assert_equal(utx['txid'], dec_tx['vin'][0]['txid'])
         assert_equal("00", dec_tx['vin'][0]['scriptSig']['hex'])
 
+        # Should fail without add_inputs:
+        assert_raises_rpc_error(-4, "Insufficient funds", self.nodes[2].fundrawtransaction, rawtx, {"add_inputs": False})
+        # add_inputs is enabled by default
         rawtxfund = self.nodes[2].fundrawtransaction(rawtx)
+
         dec_tx  = self.nodes[2].decoderawtransaction(rawtxfund['hex'])
         totalOut = 0
         matchingOuts = 0
@@ -299,7 +303,10 @@ class RawTransactionsTest(BitcoinTestFramework):
         dec_tx  = self.nodes[2].decoderawtransaction(rawtx)
         assert_equal(utx['txid'], dec_tx['vin'][0]['txid'])
 
-        rawtxfund = self.nodes[2].fundrawtransaction(rawtx)
+        # Should fail without add_inputs:
+        assert_raises_rpc_error(-4, "Insufficient funds", self.nodes[2].fundrawtransaction, rawtx, {"add_inputs": False})
+        rawtxfund = self.nodes[2].fundrawtransaction(rawtx, {"add_inputs": True})
+
         dec_tx  = self.nodes[2].decoderawtransaction(rawtxfund['hex'])
         totalOut = 0
         matchingOuts = 0
@@ -330,7 +337,10 @@ class RawTransactionsTest(BitcoinTestFramework):
         dec_tx  = self.nodes[2].decoderawtransaction(rawtx)
         assert_equal(utx['txid'], dec_tx['vin'][0]['txid'])
 
-        rawtxfund = self.nodes[2].fundrawtransaction(rawtx)
+        # Should fail without add_inputs:
+        assert_raises_rpc_error(-4, "Insufficient funds", self.nodes[2].fundrawtransaction, rawtx, {"add_inputs": False})
+        rawtxfund = self.nodes[2].fundrawtransaction(rawtx, {"add_inputs": True})
+
         dec_tx  = self.nodes[2].decoderawtransaction(rawtxfund['hex'])
         totalOut = 0
         matchingOuts = 0
@@ -500,11 +510,16 @@ class RawTransactionsTest(BitcoinTestFramework):
         self.nodes[1].getnewaddress()
         self.nodes[1].getrawchangeaddress()
         inputs = []
-        outputs = {self.nodes[0].getnewaddress():1.1}
+        outputs = {self.nodes[0].getnewaddress():1.09999500}
         rawtx = self.nodes[1].createrawtransaction(inputs, outputs)
+        # fund a transaction that does not require a new key for the change output
+        self.nodes[1].fundrawtransaction(rawtx)
+
         # fund a transaction that requires a new key for the change output
         # creating the key must be impossible because the wallet is locked
-        assert_raises_rpc_error(-4, "Keypool ran out, please call keypoolrefill first", self.nodes[1].fundrawtransaction, rawtx)
+        outputs = {self.nodes[0].getnewaddress():1.1}
+        rawtx = self.nodes[1].createrawtransaction(inputs, outputs)
+        assert_raises_rpc_error(-4, "Transaction needs a change address, but we can't generate it. Please call keypoolrefill first.", self.nodes[1].fundrawtransaction, rawtx)
 
         # Refill the keypool.
         self.nodes[1].walletpassphrase("test", 100)

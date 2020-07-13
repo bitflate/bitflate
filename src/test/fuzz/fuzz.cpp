@@ -1,4 +1,4 @@
-// Copyright (c) 2009-2019 The Bitcoin Core developers
+// Copyright (c) 2009-2020 The Bitcoin Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -12,15 +12,22 @@
 
 const std::function<void(const std::string&)> G_TEST_LOG_FUN{};
 
-#if defined(__AFL_COMPILER)
+// Decide if main(...) should be provided:
+// * AFL needs main(...) regardless of platform.
+// * macOS handles __attribute__((weak)) main(...) poorly when linking
+//   against libFuzzer. See https://github.com/bitcoin/bitcoin/pull/18008
+//   for details.
+#if defined(__AFL_COMPILER) || !defined(MAC_OSX)
+#define PROVIDE_MAIN_FUNCTION
+#endif
+
+#if defined(PROVIDE_MAIN_FUNCTION)
 static bool read_stdin(std::vector<uint8_t>& data)
 {
     uint8_t buffer[1024];
     ssize_t length = 0;
     while ((length = read(STDIN_FILENO, buffer, 1024)) > 0) {
         data.insert(data.end(), buffer, buffer + length);
-
-        if (data.size() > (1 << 20)) return false;
     }
     return length == 0;
 }
@@ -46,9 +53,8 @@ extern "C" int LLVMFuzzerInitialize(int* argc, char*** argv)
     return 0;
 }
 
-// Generally, the fuzzer will provide main(), except for AFL
-#if defined(__AFL_COMPILER)
-int main(int argc, char** argv)
+#if defined(PROVIDE_MAIN_FUNCTION)
+__attribute__((weak)) int main(int argc, char** argv)
 {
     initialize();
 #ifdef __AFL_INIT

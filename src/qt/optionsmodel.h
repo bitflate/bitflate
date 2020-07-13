@@ -6,6 +6,7 @@
 #define BITCOIN_QT_OPTIONSMODEL_H
 
 #include <amount.h>
+#include <cstdint>
 #include <qt/guiconstants.h>
 
 #include <QAbstractListModel>
@@ -15,7 +16,7 @@ class Node;
 }
 
 extern const char *DEFAULT_GUI_PROXY_HOST;
-static constexpr unsigned short DEFAULT_GUI_PROXY_PORT = 9050;
+static constexpr uint16_t DEFAULT_GUI_PROXY_PORT = 9050;
 
 /**
  * Convert configured prune target MiB to displayed GB. Round up to avoid underestimating max disk usage.
@@ -68,9 +69,9 @@ public:
     void Init(bool resetSettings = false);
     void Reset();
 
-    int rowCount(const QModelIndex & parent = QModelIndex()) const;
-    QVariant data(const QModelIndex & index, int role = Qt::DisplayRole) const;
-    bool setData(const QModelIndex & index, const QVariant & value, int role = Qt::EditRole);
+    int rowCount(const QModelIndex & parent = QModelIndex()) const override;
+    QVariant data(const QModelIndex & index, int role = Qt::DisplayRole) const override;
+    bool setData(const QModelIndex & index, const QVariant & value, int role = Qt::EditRole) override;
     /** Updates current unit in memory, settings and emits displayUnitChanged(newUnit) signal */
     void setDisplayUnit(const QVariant &value);
 

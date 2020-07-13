@@ -37,7 +37,14 @@ https://github.com/bitflate/bitflate/blob/master/src/validation.cpp#L1007
 
 - And here's the test for block reward:
 
-https://github.com/bitflate/bitflate/blob/master/src/test/validation_tests.cpp#L25
+The `master` branch is regularly built (see `doc/build-*.md` for instructions) and tested, but it is not guaranteed to be
+completely stable. [Tags](https://github.com/bitcoin/bitcoin/tags) are created
+regularly from release branches to indicate new official, stable release versions of Bitcoin Core.
+
+The https://github.com/bitcoin-core/gui repository is used exclusively for the
+development of the GUI. Its master branch is identical in all monotree
+repositories. Release branches and tags do not exist, so please do not fork
+that repository unless it is for development reasons.
 
 - Block reward schedule:
 

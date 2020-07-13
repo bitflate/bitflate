@@ -1,8 +1,9 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
-// Copyright (c) 2009-2019 The Bitcoin Core developers
+// Copyright (c) 2009-2020 The Bitcoin Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#include <cstdint>
 #include <netaddress.h>
 #include <hash.h>
 #include <util/strencodings.h>
@@ -627,15 +628,15 @@ CService::CService() : port(0)
 {
 }
 
-CService::CService(const CNetAddr& cip, unsigned short portIn) : CNetAddr(cip), port(portIn)
+CService::CService(const CNetAddr& cip, uint16_t portIn) : CNetAddr(cip), port(portIn)
 {
 }
 
-CService::CService(const struct in_addr& ipv4Addr, unsigned short portIn) : CNetAddr(ipv4Addr), port(portIn)
+CService::CService(const struct in_addr& ipv4Addr, uint16_t portIn) : CNetAddr(ipv4Addr), port(portIn)
 {
 }
 
-CService::CService(const struct in6_addr& ipv6Addr, unsigned short portIn) : CNetAddr(ipv6Addr), port(portIn)
+CService::CService(const struct in6_addr& ipv6Addr, uint16_t portIn) : CNetAddr(ipv6Addr), port(portIn)
 {
 }
 
@@ -663,7 +664,7 @@ bool CService::SetSockAddr(const struct sockaddr *paddr)
     }
 }
 
-unsigned short CService::GetPort() const
+uint16_t CService::GetPort() const
 {
     return port;
 }
@@ -893,4 +894,9 @@ bool operator==(const CSubNet& a, const CSubNet& b)
 bool operator<(const CSubNet& a, const CSubNet& b)
 {
     return (a.network < b.network || (a.network == b.network && memcmp(a.netmask, b.netmask, 16) < 0));
+}
+
+bool SanityCheckASMap(const std::vector<bool>& asmap)
+{
+    return SanityCheckASMap(asmap, 128); // For IP address lookups, the input is 128 bits
 }

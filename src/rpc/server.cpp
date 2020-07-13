@@ -11,21 +11,24 @@
 #include <util/strencodings.h>
 #include <util/system.h>
 
-#include <boost/signals2/signal.hpp>
 #include <boost/algorithm/string/classification.hpp>
 #include <boost/algorithm/string/split.hpp>
+#include <boost/signals2/signal.hpp>
 
+#include <cassert>
 #include <memory> // for unique_ptr
+#include <mutex>
 #include <unordered_map>
 
-static RecursiveMutex cs_rpcWarmup;
+static Mutex g_rpc_warmup_mutex;
 static std::atomic<bool> g_rpc_running{false};
-static bool fRPCInWarmup GUARDED_BY(cs_rpcWarmup) = true;
-static std::string rpcWarmupStatus GUARDED_BY(cs_rpcWarmup) = "RPC server started";
+static bool fRPCInWarmup GUARDED_BY(g_rpc_warmup_mutex) = true;
+static std::string rpcWarmupStatus GUARDED_BY(g_rpc_warmup_mutex) = "RPC server started";
 /* Timer-creating functions */
 static RPCTimerInterface* timerInterface = nullptr;
 /* Map of name to timer. */
-static std::map<std::string, std::unique_ptr<RPCTimerBase> > deadlineTimers;
+static Mutex g_deadline_timers_mutex;
+static std::map<std::string, std::unique_ptr<RPCTimerBase> > deadlineTimers GUARDED_BY(g_deadline_timers_mutex);
 static bool ExecuteCommand(const CRPCCommand& command, const JSONRPCRequest& request, UniValue& result, bool last_handler);
 
 struct RPCCommandExecutionInfo
@@ -290,17 +293,26 @@ void StartRPC()
 
 void InterruptRPC()
 {
-    LogPrint(BCLog::RPC, "Interrupting RPC\n");
-    // Interrupt e.g. running longpolls
-    g_rpc_running = false;
+    static std::once_flag g_rpc_interrupt_flag;
+    // This function could be called twice if the GUI has been started with -server=1.
+    std::call_once(g_rpc_interrupt_flag, []() {
+        LogPrint(BCLog::RPC, "Interrupting RPC\n");
+        // Interrupt e.g. running longpolls
+        g_rpc_running = false;
+    });
 }
 
 void StopRPC()
 {
-    LogPrint(BCLog::RPC, "Stopping RPC\n");
-    deadlineTimers.clear();
-    DeleteAuthCookie();
-    g_rpcSignals.Stopped();
+    static std::once_flag g_rpc_stop_flag;
+    // This function could be called twice if the GUI has been started with -server=1.
+    assert(!g_rpc_running);
+    std::call_once(g_rpc_stop_flag, []() {
+        LogPrint(BCLog::RPC, "Stopping RPC\n");
+        WITH_LOCK(g_deadline_timers_mutex, deadlineTimers.clear());
+        DeleteAuthCookie();
+        g_rpcSignals.Stopped();
+    });
 }
 
 bool IsRPCRunning()
@@ -308,22 +320,27 @@ bool IsRPCRunning()
     return g_rpc_running;
 }
 
+void RpcInterruptionPoint()
+{
+    if (!IsRPCRunning()) throw JSONRPCError(RPC_CLIENT_NOT_CONNECTED, "Shutting down");
+}
+
 void SetRPCWarmupStatus(const std::string& newStatus)
 {
-    LOCK(cs_rpcWarmup);
+    LOCK(g_rpc_warmup_mutex);
     rpcWarmupStatus = newStatus;
 }
 
 void SetRPCWarmupFinished()
 {
-    LOCK(cs_rpcWarmup);
+    LOCK(g_rpc_warmup_mutex);
     assert(fRPCInWarmup);
     fRPCInWarmup = false;
 }
 
 bool RPCIsInWarmup(std::string *outStatus)
 {
-    LOCK(cs_rpcWarmup);
+    LOCK(g_rpc_warmup_mutex);
     if (outStatus)
         *outStatus = rpcWarmupStatus;
     return fRPCInWarmup;
@@ -422,7 +439,7 @@ UniValue CRPCTable::execute(const JSONRPCRequest &request) const
 {
     // Return immediately if in warmup
     {
-        LOCK(cs_rpcWarmup);
+        LOCK(g_rpc_warmup_mutex);
         if (fRPCInWarmup)
             throw JSONRPCError(RPC_IN_WARMUP, rpcWarmupStatus);
     }
@@ -486,6 +503,7 @@ void RPCRunLater(const std::string& name, std::function<void()> func, int64_t nS
 {
     if (!timerInterface)
         throw JSONRPCError(RPC_INTERNAL_ERROR, "No timer handler registered for RPC");
+    LOCK(g_deadline_timers_mutex);
     deadlineTimers.erase(name);
     LogPrint(BCLog::RPC, "queue run of timer %s in %i seconds (using %s)\n", name, nSeconds, timerInterface->Name());
     deadlineTimers.emplace(name, std::unique_ptr<RPCTimerBase>(timerInterface->NewTimer(func, nSeconds*1000)));

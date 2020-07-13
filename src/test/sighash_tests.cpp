@@ -1,18 +1,18 @@
-// Copyright (c) 2013-2019 The Bitcoin Core developers
+// Copyright (c) 2013-2020 The Bitcoin Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include <consensus/tx_check.h>
 #include <consensus/validation.h>
-#include <test/data/sighash.json.h>
 #include <hash.h>
 #include <script/interpreter.h>
 #include <script/script.h>
 #include <serialize.h>
 #include <streams.h>
+#include <test/data/sighash.json.h>
 #include <test/util/setup_common.h>
-#include <util/system.h>
 #include <util/strencodings.h>
+#include <util/system.h>
 #include <version.h>
 
 #include <iostream>
@@ -141,7 +141,7 @@ BOOST_AUTO_TEST_CASE(sighash_test)
         ss << txTo;
 
         std::cout << "\t[\"" ;
-        std::cout << HexStr(ss.begin(), ss.end()) << "\", \"";
+        std::cout << HexStr(ss) << "\", \"";
         std::cout << HexStr(scriptCode) << "\", ";
         std::cout << nIn << ", ";
         std::cout << nHashType << ", \"";

@@ -21,15 +21,24 @@ class CConnman;
 class CValidationInterface;
 class uint256;
 class CScheduler;
+enum class MemPoolRemovalReason;
 
-// These functions dispatch to one or all registered wallets
-
-/** Register a wallet to receive updates from core */
-void RegisterValidationInterface(CValidationInterface* pwalletIn);
-/** Unregister a wallet from core */
-void UnregisterValidationInterface(CValidationInterface* pwalletIn);
-/** Unregister all wallets from core */
+/** Register subscriber */
+void RegisterValidationInterface(CValidationInterface* callbacks);
+/** Unregister subscriber. DEPRECATED. This is not safe to use when the RPC server or main message handler thread is running. */
+void UnregisterValidationInterface(CValidationInterface* callbacks);
+/** Unregister all subscribers */
 void UnregisterAllValidationInterfaces();
+
+// Alternate registration functions that release a shared_ptr after the last
+// notification is sent. These are useful for race-free cleanup, since
+// unregistration is nonblocking and can return before the last notification is
+// processed.
+/** Register subscriber */
+void RegisterSharedValidationInterface(std::shared_ptr<CValidationInterface> callbacks);
+/** Unregister subscriber */
+void UnregisterSharedValidationInterface(std::shared_ptr<CValidationInterface> callbacks);
+
 /**
  * Pushes a function to callback onto the notification queue, guaranteeing any
  * callbacks generated prior to now are finished when the function is called.
@@ -88,7 +97,7 @@ protected:
      *
      * Called on a background thread.
      */
-    virtual void TransactionAddedToMempool(const CTransactionRef &ptxn) {}
+    virtual void TransactionAddedToMempool(const CTransactionRef& tx) {}
     /**
      * Notifies listeners of a transaction leaving mempool.
      *
@@ -121,7 +130,7 @@ protected:
      *
      * Called on a background thread.
      */
-    virtual void TransactionRemovedFromMempool(const CTransactionRef &ptx) {}
+    virtual void TransactionRemovedFromMempool(const CTransactionRef& tx, MemPoolRemovalReason reason) {}
     /**
      * Notifies listeners of a block being connected.
      * Provides a vector of transactions evicted from the mempool as a result.
@@ -163,9 +172,7 @@ protected:
      * Notifies listeners that a block which builds directly on our current tip
      * has been received and connected to the headers tree, though not validated yet */
     virtual void NewPoWValidBlock(const CBlockIndex *pindex, const std::shared_ptr<const CBlock>& block) {};
-    friend void ::RegisterValidationInterface(CValidationInterface*);
-    friend void ::UnregisterValidationInterface(CValidationInterface*);
-    friend void ::UnregisterAllValidationInterfaces();
+    friend class CMainSignals;
 };
 
 struct MainSignalsInstance;
@@ -173,7 +180,7 @@ class CMainSignals {
 private:
     std::unique_ptr<MainSignalsInstance> m_internals;
 
-    friend void ::RegisterValidationInterface(CValidationInterface*);
+    friend void ::RegisterSharedValidationInterface(std::shared_ptr<CValidationInterface>);
     friend void ::UnregisterValidationInterface(CValidationInterface*);
     friend void ::UnregisterAllValidationInterfaces();
     friend void ::CallFunctionInValidationInterfaceQueue(std::function<void ()> func);
@@ -190,8 +197,8 @@ public:
 
 
     void UpdatedBlockTip(const CBlockIndex *, const CBlockIndex *, bool fInitialDownload);
-    void TransactionAddedToMempool(const CTransactionRef &);
-    void TransactionRemovedFromMempool(const CTransactionRef &);
+    void TransactionAddedToMempool(const CTransactionRef&);
+    void TransactionRemovedFromMempool(const CTransactionRef&, MemPoolRemovalReason);
     void BlockConnected(const std::shared_ptr<const CBlock> &, const CBlockIndex *pindex);
     void BlockDisconnected(const std::shared_ptr<const CBlock> &, const CBlockIndex* pindex);
     void ChainStateFlushed(const CBlockLocator &);
