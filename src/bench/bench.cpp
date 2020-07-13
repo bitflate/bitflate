@@ -1,4 +1,4 @@
-// Copyright (c) 2015-2019 The Bitcoin Core developers
+// Copyright (c) 2015-2020 The Bitcoin Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -14,6 +14,8 @@
 #include <iostream>
 #include <numeric>
 #include <regex>
+
+const std::function<void(const std::string&)> G_TEST_LOG_FUN{};
 
 void benchmark::ConsolePrinter::header()
 {
@@ -112,14 +114,6 @@ void benchmark::BenchRunner::RunAll(Printer& printer, uint64_t num_evals, double
     printer.header();
 
     for (const auto& p : benchmarks()) {
-        RegTestingSetup test{};
-        {
-            LOCK(cs_main);
-            assert(::ChainActive().Height() == 0);
-            const bool witness_enabled{IsWitnessEnabled(::ChainActive().Tip(), Params().GetConsensus())};
-            assert(witness_enabled);
-        }
-
         if (!std::regex_match(p.first, baseMatch, reFilter)) {
             continue;
         }

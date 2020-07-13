@@ -4,10 +4,11 @@ distro: "ubuntu"
 suites:
 - "bionic"
 architectures:
-- "linux64"
+- "amd64"
 packages:
 - "libssl-dev"
 - "autoconf"
+- "automake"
 - "libtool"
 - "pkg-config"
 remotes:

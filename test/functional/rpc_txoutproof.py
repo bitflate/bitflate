@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Copyright (c) 2014-2018 The Bitcoin Core developers
+# Copyright (c) 2014-2019 The Bitcoin Core developers
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
 """Test gettxoutproof and verifytxoutproof RPCs."""
@@ -14,7 +14,6 @@ class MerkleBlockTest(BitcoinTestFramework):
         self.setup_clean_chain = True
         # Nodes 0/1 are "wallet" nodes, Nodes 2/3 are used for testing
         self.extra_args = [[], [], [], ["-txindex"]]
-        self.supports_cli = False
 
     def skip_test_if_missing_module(self):
         self.skip_if_no_wallet()

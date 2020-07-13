@@ -1,4 +1,4 @@
-// Copyright (c) 2018 The Bitcoin Core developers
+// Copyright (c) 2018-2019 The Bitcoin Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -10,6 +10,7 @@
 #include <net_types.h>  // For banmap_t
 #include <netaddress.h> // For Network
 #include <support/allocators/secure.h> // For SecureString
+#include <util/translation.h>
 
 #include <functional>
 #include <memory>
@@ -27,13 +28,16 @@ class Coin;
 class RPCTimerInterface;
 class UniValue;
 class proxyType;
+enum class SynchronizationState;
+enum class WalletCreationStatus;
 struct CNodeStateStats;
 struct NodeContext;
-enum class WalletCreationStatus;
+struct bilingual_str;
 
 namespace interfaces {
 class Handler;
 class Wallet;
+struct BlockTip;
 
 //! Top-level interface for a bitcoin node (bitcoind process).
 class Node
@@ -42,7 +46,7 @@ public:
     virtual ~Node() {}
 
     //! Send init error.
-    virtual void initError(const std::string& message) = 0;
+    virtual void initError(const bilingual_str& message) = 0;
 
     //! Set command line arguments.
     virtual bool parseParameters(int argc, const char* const argv[], std::string& error) = 0;
@@ -78,7 +82,7 @@ public:
     virtual void initParameterInteraction() = 0;
 
     //! Get warnings.
-    virtual std::string getWarnings(const std::string& type) = 0;
+    virtual bilingual_str getWarnings() = 0;
 
     // Get log flags.
     virtual uint32_t getLogCategories() = 0;
@@ -118,16 +122,16 @@ public:
     virtual bool getBanned(banmap_t& banmap) = 0;
 
     //! Ban node.
-    virtual bool ban(const CNetAddr& net_addr, BanReason reason, int64_t ban_time_offset) = 0;
+    virtual bool ban(const CNetAddr& net_addr, int64_t ban_time_offset) = 0;
 
     //! Unban node.
     virtual bool unban(const CSubNet& ip) = 0;
 
     //! Disconnect node by address.
-    virtual bool disconnect(const CNetAddr& net_addr) = 0;
+    virtual bool disconnectByAddress(const CNetAddr& net_addr) = 0;
 
     //! Disconnect node by id.
-    virtual bool disconnect(NodeId id) = 0;
+    virtual bool disconnectById(NodeId id) = 0;
 
     //! Get total bytes recv.
     virtual int64_t getTotalBytesRecv() = 0;
@@ -146,6 +150,9 @@ public:
 
     //! Get num blocks.
     virtual int getNumBlocks() = 0;
+
+    //! Get best block hash.
+    virtual uint256 getBestBlockHash() = 0;
 
     //! Get last block time.
     virtual int64_t getLastBlockTime() = 0;
@@ -201,10 +208,10 @@ public:
     //! Attempts to load a wallet from file or directory.
     //! The loaded wallet is also notified to handlers previously registered
     //! with handleLoadWallet.
-    virtual std::unique_ptr<Wallet> loadWallet(const std::string& name, std::string& error, std::vector<std::string>& warnings) = 0;
+    virtual std::unique_ptr<Wallet> loadWallet(const std::string& name, bilingual_str& error, std::vector<bilingual_str>& warnings) = 0;
 
     //! Create a wallet from file
-    virtual WalletCreationStatus createWallet(const SecureString& passphrase, uint64_t wallet_creation_flags, const std::string& name, std::string& error, std::vector<std::string>& warnings, std::unique_ptr<Wallet>& result) = 0;
+    virtual std::unique_ptr<Wallet> createWallet(const SecureString& passphrase, uint64_t wallet_creation_flags, const std::string& name, bilingual_str& error, std::vector<bilingual_str>& warnings, WalletCreationStatus& status) = 0;
 
     //! Register handler for init messages.
     using InitMessageFn = std::function<void(const std::string& message)>;
@@ -212,11 +219,11 @@ public:
 
     //! Register handler for message box messages.
     using MessageBoxFn =
-        std::function<bool(const std::string& message, const std::string& caption, unsigned int style)>;
+        std::function<bool(const bilingual_str& message, const std::string& caption, unsigned int style)>;
     virtual std::unique_ptr<Handler> handleMessageBox(MessageBoxFn fn) = 0;
 
     //! Register handler for question messages.
-    using QuestionFn = std::function<bool(const std::string& message,
+    using QuestionFn = std::function<bool(const bilingual_str& message,
         const std::string& non_interactive_message,
         const std::string& caption,
         unsigned int style)>;
@@ -248,12 +255,12 @@ public:
 
     //! Register handler for block tip messages.
     using NotifyBlockTipFn =
-        std::function<void(bool initial_download, int height, int64_t block_time, double verification_progress)>;
+        std::function<void(SynchronizationState, interfaces::BlockTip tip, double verification_progress)>;
     virtual std::unique_ptr<Handler> handleNotifyBlockTip(NotifyBlockTipFn fn) = 0;
 
     //! Register handler for header tip messages.
     using NotifyHeaderTipFn =
-        std::function<void(bool initial_download, int height, int64_t block_time, double verification_progress)>;
+        std::function<void(SynchronizationState, interfaces::BlockTip tip, double verification_progress)>;
     virtual std::unique_ptr<Handler> handleNotifyHeaderTip(NotifyHeaderTipFn fn) = 0;
 
     //! Return pointer to internal chain interface, useful for testing.
@@ -262,6 +269,13 @@ public:
 
 //! Return implementation of Node interface.
 std::unique_ptr<Node> MakeNode();
+
+//! Block tip (could be a header or not, depends on the subscribed signal).
+struct BlockTip {
+    int block_height;
+    int64_t block_time;
+    uint256 block_hash;
+};
 
 } // namespace interfaces
 

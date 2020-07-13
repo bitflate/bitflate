@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Copyright (c) 2014-2019 The Bitcoin Core developers
+# Copyright (c) 2014-2020 The Bitcoin Core developers
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
 """Test the pruning code.
@@ -101,7 +101,7 @@ class PruneTest(BitcoinTestFramework):
     def setup_network(self):
         self.setup_nodes()
 
-        self.prunedir = os.path.join(self.nodes[2].datadir, 'regtest', 'blocks', '')
+        self.prunedir = os.path.join(self.nodes[2].datadir, self.chain, 'blocks', '')
 
         connect_nodes(self.nodes[0], 1)
         connect_nodes(self.nodes[1], 2)
@@ -263,8 +263,7 @@ class PruneTest(BitcoinTestFramework):
         assert_raises_rpc_error(-1, "not in prune mode", node.pruneblockchain, 500)
 
         # now re-start in manual pruning mode
-        self.stop_node(node_number)
-        self.start_node(node_number, extra_args=["-prune=1"])
+        self.restart_node(node_number, extra_args=["-prune=1"])
         node = self.nodes[node_number]
         assert_equal(node.getblockcount(), 995)
 
@@ -279,7 +278,7 @@ class PruneTest(BitcoinTestFramework):
             assert_equal(ret, node.getblockchaininfo()['pruneheight'])
 
         def has_block(index):
-            return os.path.isfile(os.path.join(self.nodes[node_number].datadir, "regtest", "blocks", "blk{:05}.dat".format(index)))
+            return os.path.isfile(os.path.join(self.nodes[node_number].datadir, self.chain, "blocks", "blk{:05}.dat".format(index)))
 
         # should not prune because chain tip of node 3 (995) < PruneAfterHeight (1000)
         assert_raises_rpc_error(-1, "Blockchain is too short for pruning", node.pruneblockchain, height(500))
@@ -326,16 +325,14 @@ class PruneTest(BitcoinTestFramework):
         assert not has_block(3), "blk00003.dat is still there, should be pruned by now"
 
         # stop node, start back up with auto-prune at 550 MiB, make sure still runs
-        self.stop_node(node_number)
-        self.start_node(node_number, extra_args=["-prune=550"])
+        self.restart_node(node_number, extra_args=["-prune=550"])
 
         self.log.info("Success")
 
     def wallet_test(self):
         # check that the pruning node's wallet is still in good shape
         self.log.info("Stop and start pruning node to trigger wallet rescan")
-        self.stop_node(2)
-        self.start_node(2, extra_args=["-prune=550"])
+        self.restart_node(2, extra_args=["-prune=550"])
         self.log.info("Success")
 
         # check that wallet loads successfully when restarting a pruned node after IBD.
@@ -344,8 +341,7 @@ class PruneTest(BitcoinTestFramework):
         connect_nodes(self.nodes[0], 5)
         nds = [self.nodes[0], self.nodes[5]]
         self.sync_blocks(nds, wait=5, timeout=300)
-        self.stop_node(5)  # stop and start to trigger rescan
-        self.start_node(5, extra_args=["-prune=550"])
+        self.restart_node(5, extra_args=["-prune=550"]) # restart to trigger rescan
         self.log.info("Success")
 
     def run_test(self):

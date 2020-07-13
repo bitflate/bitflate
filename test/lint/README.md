@@ -21,6 +21,13 @@ maintained:
 * for `src/leveldb`: https://github.com/bitcoin-core/leveldb.git (branch bitcoin-fork)
 * for `src/univalue`: https://github.com/bitcoin-core/univalue.git (branch master)
 * for `src/crypto/ctaes`: https://github.com/bitcoin-core/ctaes.git (branch master)
+* for `src/crc32c`: https://github.com/google/crc32c.git (branch master)
+
+To do so, add the upstream repository as remote:
+
+```
+git remote add --fetch secp256k1 https://github.com/bitcoin-core/secp256k1.git
+```
 
 Usage: `git-subtree-check.sh DIR (COMMIT)`
 

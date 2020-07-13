@@ -1,4 +1,4 @@
-// Copyright (c) 2011-2018 The Bitcoin Core developers
+// Copyright (c) 2011-2019 The Bitcoin Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -135,6 +135,8 @@ OptionsDialog::OptionsDialog(QWidget *parent, bool enableWallet) :
         ui->minimizeToTray->setChecked(false);
         ui->minimizeToTray->setEnabled(false);
     }
+
+    GUIUtil::handleCloseWindowShortcut(this);
 }
 
 OptionsDialog::~OptionsDialog()
@@ -375,7 +377,7 @@ QValidator::State ProxyAddressValidator::validate(QString &input, int &pos) cons
 {
     Q_UNUSED(pos);
     // Validate the proxy
-    CService serv(LookupNumeric(input.toStdString().c_str(), DEFAULT_GUI_PROXY_PORT));
+    CService serv(LookupNumeric(input.toStdString(), DEFAULT_GUI_PROXY_PORT));
     proxyType addrProxy = proxyType(serv, true);
     if (addrProxy.IsValid())
         return QValidator::Acceptable;

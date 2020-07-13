@@ -1,5 +1,5 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
-// Copyright (c) 2009-2018 The Bitcoin Core developers
+// Copyright (c) 2009-2019 The Bitcoin Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -11,7 +11,17 @@
 
 #include <string>
 
-extern const std::string CURRENCY_UNIT;
+const std::string CURRENCY_UNIT = "BTC"; // One formatted unit
+const std::string CURRENCY_ATOM = "sat"; // One indivisible minimum value unit
+
+/* Used to determine type of fee estimation requested */
+enum class FeeEstimateMode {
+    UNSET,        //!< Use default settings based on other criteria
+    ECONOMICAL,   //!< Force estimateSmartFee to use non-conservative estimates
+    CONSERVATIVE, //!< Force estimateSmartFee to use conservative estimates
+    BTC_KB,       //!< Use explicit BTC/kB fee given in coin control
+    SAT_B,        //!< Use explicit sat/B fee given in coin control
+};
 
 /**
  * Fee rate in satoshis per kilobyte: CAmount / kB
@@ -46,14 +56,9 @@ public:
     friend bool operator>=(const CFeeRate& a, const CFeeRate& b) { return a.nSatoshisPerK >= b.nSatoshisPerK; }
     friend bool operator!=(const CFeeRate& a, const CFeeRate& b) { return a.nSatoshisPerK != b.nSatoshisPerK; }
     CFeeRate& operator+=(const CFeeRate& a) { nSatoshisPerK += a.nSatoshisPerK; return *this; }
-    std::string ToString() const;
+    std::string ToString(const FeeEstimateMode& fee_estimate_mode = FeeEstimateMode::BTC_KB) const;
 
-    ADD_SERIALIZE_METHODS;
-
-    template <typename Stream, typename Operation>
-    inline void SerializationOp(Stream& s, Operation ser_action) {
-        READWRITE(nSatoshisPerK);
-    }
+    SERIALIZE_METHODS(CFeeRate, obj) { READWRITE(obj.nSatoshisPerK); }
 };
 
 #endif //  BITCOIN_POLICY_FEERATE_H

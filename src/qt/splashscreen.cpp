@@ -1,4 +1,4 @@
-// Copyright (c) 2011-2018 The Bitcoin Core developers
+// Copyright (c) 2011-2020 The Bitcoin Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -14,7 +14,6 @@
 #include <interfaces/wallet.h>
 #include <qt/guiutil.h>
 #include <qt/networkstyle.h>
-#include <ui_interface.h>
 #include <util/system.h>
 #include <util/translation.h>
 
@@ -127,6 +126,8 @@ SplashScreen::SplashScreen(interfaces::Node& node, Qt::WindowFlags f, const Netw
 
     subscribeToCoreSignals();
     installEventFilter(this);
+
+    GUIUtil::handleCloseWindowShortcut(this);
 }
 
 SplashScreen::~SplashScreen()
@@ -137,7 +138,7 @@ SplashScreen::~SplashScreen()
 bool SplashScreen::eventFilter(QObject * obj, QEvent * ev) {
     if (ev->type() == QEvent::KeyPress) {
         QKeyEvent *keyEvent = static_cast<QKeyEvent *>(ev);
-        if(keyEvent->text()[0] == 'q') {
+        if (keyEvent->key() == Qt::Key_Q) {
             m_node.startShutdown();
         }
     }

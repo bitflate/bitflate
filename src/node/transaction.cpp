@@ -1,5 +1,5 @@
 // Copyright (c) 2010 Satoshi Nakamoto
-// Copyright (c) 2009-2018 The Bitcoin Core developers
+// Copyright (c) 2009-2019 The Bitcoin Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -7,7 +7,6 @@
 #include <net.h>
 #include <net_processing.h>
 #include <node/context.h>
-#include <util/validation.h>
 #include <validation.h>
 #include <validationinterface.h>
 #include <node/transaction.h>
@@ -20,6 +19,7 @@ TransactionError BroadcastTransaction(NodeContext& node, const CTransactionRef t
     // node.connman is assigned both before chain clients and before RPC server is accepting calls,
     // and reset after chain clients and RPC sever are stopped. node.connman should never be null here.
     assert(node.connman);
+    assert(node.mempool);
     std::promise<void> promise;
     uint256 hashTx = tx->GetHash();
     bool callback_set = false;
@@ -35,12 +35,12 @@ TransactionError BroadcastTransaction(NodeContext& node, const CTransactionRef t
         // So if the output does exist, then this transaction exists in the chain.
         if (!existingCoin.IsSpent()) return TransactionError::ALREADY_IN_CHAIN;
     }
-    if (!mempool.exists(hashTx)) {
+    if (!node.mempool->exists(hashTx)) {
         // Transaction is not already in the mempool. Submit it.
         TxValidationState state;
-        if (!AcceptToMemoryPool(mempool, state, std::move(tx),
+        if (!AcceptToMemoryPool(*node.mempool, state, std::move(tx),
                 nullptr /* plTxnReplaced */, false /* bypass_limits */, max_tx_fee)) {
-            err_string = FormatStateMessage(state);
+            err_string = state.ToString();
             if (state.IsInvalid()) {
                 if (state.GetResult() == TxValidationResult::TX_MISSING_INPUTS) {
                     return TransactionError::MISSING_INPUTS;
@@ -78,6 +78,10 @@ TransactionError BroadcastTransaction(NodeContext& node, const CTransactionRef t
     }
 
     if (relay) {
+        // the mempool tracks locally submitted transactions to make a
+        // best-effort of initial broadcast
+        node.mempool->AddUnbroadcastTx(hashTx);
+
         RelayTransaction(hashTx, *node.connman);
     }
 

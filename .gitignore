@@ -5,10 +5,13 @@
 src/bitcoin
 src/bitcoind
 src/bitcoin-cli
+src/bitcoin-gui
+src/bitcoin-node
 src/bitcoin-tx
 src/bitcoin-wallet
+src/test/fuzz
+!src/test/fuzz/*.*
 src/test/test_bitcoin
-src/test/test_bitcoin_fuzzy
 src/qt/test/test_bitcoin-qt
 
 # autoreconf
@@ -28,6 +31,7 @@ build-aux/m4/ltversion.m4
 build-aux/missing
 build-aux/compile
 build-aux/test-driver
+config.cache
 config.log
 config.status
 configure
@@ -88,7 +92,7 @@ src/qt/bitcoin-qt.includes
 *.qm
 Makefile
 !depends/Makefile
-bitcoin-qt
+src/qt/bitcoin-qt
 Bitcoin-Qt.app
 background.tiff*
 
@@ -106,6 +110,9 @@ qrc_*.cpp
 .DS_Store
 build
 
+# Previous releases
+releases
+
 #lcov
 *.gcno
 *.gcda
@@ -120,6 +127,7 @@ linux-build
 win32-build
 test/config.ini
 test/cache/*
+test/.mypy_cache/
 
 !src/leveldb*/Makefile
 

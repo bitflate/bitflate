@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
 #
-# Copyright (c) 2017 The Bitcoin Core developers
+# Copyright (c) 2017-2019 The Bitcoin Core developers
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
 #
 # Check for specified flake8 warnings in python files.
 
 export LC_ALL=C
+export MYPY_CACHE_DIR="${BASE_ROOT_DIR}/test/.mypy_cache"
 
 enabled=(
     E101 # indentation contains mixed spaces and tabs
@@ -38,7 +39,6 @@ enabled=(
     E711 # comparison to None should be 'if cond is None:'
     E714 # test for object identity should be "is not"
     E721 # do not compare types, use "isinstance()"
-    E741 # do not use variables named "l", "O", or "I"
     E742 # do not define classes named "l", "O", or "I"
     E743 # do not define functions named "l", "O", or "I"
     E901 # SyntaxError: invalid syntax
@@ -89,10 +89,20 @@ elif PYTHONWARNINGS="ignore" flake8 --version | grep -q "Python 2"; then
     exit 0
 fi
 
-PYTHONWARNINGS="ignore" flake8 --ignore=B,C,E,F,I,N,W --select=$(IFS=","; echo "${enabled[*]}") $(
+EXIT_CODE=0
+
+if ! PYTHONWARNINGS="ignore" flake8 --ignore=B,C,E,F,I,N,W --select=$(IFS=","; echo "${enabled[*]}") $(
     if [[ $# == 0 ]]; then
         git ls-files "*.py"
     else
         echo "$@"
     fi
-)
+); then
+    EXIT_CODE=1
+fi
+
+if ! mypy --ignore-missing-imports $(git ls-files "test/functional/*.py"); then
+    EXIT_CODE=1
+fi
+
+exit $EXIT_CODE

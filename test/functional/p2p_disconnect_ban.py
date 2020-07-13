@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Copyright (c) 2014-2018 The Bitcoin Core developers
+# Copyright (c) 2014-2019 The Bitcoin Core developers
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
 """Test node disconnect and ban behavior"""
@@ -69,8 +69,7 @@ class DisconnectBanTest(BitcoinTestFramework):
         self.nodes[1].setmocktime(old_time + 3)
         assert_equal(len(self.nodes[1].listbanned()), 3)
 
-        self.stop_node(1)
-        self.start_node(1)
+        self.restart_node(1)
 
         listAfterShutdown = self.nodes[1].listbanned()
         assert_equal("127.0.0.0/24", listAfterShutdown[0]['address'])
