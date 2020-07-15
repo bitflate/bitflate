@@ -85,10 +85,6 @@ if BUILD_BITCOIND
   bin_PROGRAMS += bitflated
 endif
 
-if BUILD_BITCOIN_NODE
-  bin_PROGRAMS += bitflate-node
-endif
-
 if BUILD_BITCOIN_CLI
   bin_PROGRAMS += bitflate-cli
 endif
@@ -538,10 +534,6 @@ libbitcoin_util_a_SOURCES = \
   util/time.cpp \
   $(BITCOIN_CORE_H)
 
-if USE_LIBEVENT
-libbitcoin_util_a_SOURCES += util/url.cpp
-endif
-
 if GLIBC_BACK_COMPAT
 libbitcoin_util_a_SOURCES += compat/glibc_compat.cpp
 AM_LDFLAGS += $(COMPAT_LDFLAGS)
@@ -589,12 +581,6 @@ bitflated_CPPFLAGS = $(bitcoin_bin_cppflags)
 bitflated_CXXFLAGS = $(bitcoin_bin_cxxflags)
 bitflated_LDFLAGS = $(bitcoin_bin_ldflags)
 bitflated_LDADD = $(LIBBITCOIN_SERVER) $(bitcoin_bin_ldadd)
-
-bitflate_node_SOURCES = $(bitcoin_daemon_sources)
-bitflate_node_CPPFLAGS = $(bitcoin_bin_cppflags)
-bitflate_node_CXXFLAGS = $(bitcoin_bin_cxxflags)
-bitflate_node_LDFLAGS = $(bitcoin_bin_ldflags)
-bitflate_node_LDADD = $(LIBBITCOIN_SERVER) $(bitcoin_bin_ldadd)
 
 # bitcoin-cli binary #
 bitflate_cli_SOURCES = bitcoin-cli.cpp
