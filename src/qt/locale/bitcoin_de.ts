@@ -3,7 +3,7 @@
     <name>AddressBookPage</name>
     <message>
         <source>Right-click to edit address or label</source>
-        <translation>Rechtsklick zum Bearbeiten der Adresse oder der Bezeichnung</translation>
+        <translation>Rechtsklick zum Bearbeiten der Adresse oder der Beschreibung</translation>
     </message>
     <message>
         <source>Create a new address</source>
@@ -31,7 +31,7 @@
     </message>
     <message>
         <source>Enter address or label to search</source>
-        <translation>Zu suchende Adresse oder Bezeichnung eingeben</translation>
+        <translation>Zu suchende Adresse oder Beschreibung eingeben</translation>
     </message>
     <message>
         <source>Export the data in the current tab to a file</source>
@@ -1012,7 +1012,7 @@
     </message>
     <message numerus="yes">
         <source>(%n GB needed for full chain)</source>
-        <translation><numerusform>(%n GB benötigt für komplette Blockchain)</numerusform><numerusform>(%n GB benötigt für komplette Blockchain)</numerusform></translation>
+        <translation><numerusform>(%n GB benötigt für komplette Blockchain)</numerusform><numerusform>(%n GB wird die komplette Blockchain benötigen)</numerusform></translation>
     </message>
 </context>
 <context>
