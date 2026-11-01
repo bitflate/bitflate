@@ -98,3 +98,10 @@ Contact
 Email: contact@bitflate.org
 
 Twitter: https://twitter.com/bitflate
+
+#############################################################
+🩵 Support This Archive (Optional)
+This archive is provided free of charge for research and community revival. If you find it useful and wish to say thanks, you may send a voluntary donation. No obligation whatsoever.
+BTC: bc1qsswpatxtzqsgcg39w9a2ndhnx37gv75pt34jws
+LTC: ltc1qfmzsg0mj0d45qd226gthwvgp2y5cq04vpplg2z
+#############################################################
