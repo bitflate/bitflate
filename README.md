@@ -86,6 +86,15 @@ Bitflate started with Bitcoin Core codebase. It has changes in reward schedule a
 
 Bitflate is at experimental stage as of July, 2019. We strongly advise you NOT to use it for business. The network is not secure.
 
+## 🌐 Live Seed Node
+The Bitflate network has a community seed node running 24/7 on a Cloud server. To connect your wallet to the network:
+
+1. Create a file named `bitcoin.conf` in your Bitflate data folder (e.g., `%APPDATA%\Bitflate` on Windows).
+2. Add this line inside it:
+   `addnode=132.145.48.98:7333`
+
+*(Note: The network is currently seeking miners to resume block generation.)*
+
 License
 -------
 
